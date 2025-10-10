@@ -4,7 +4,6 @@
         <field name="registrar" />
         <field name="creation_date" />
         <field name="expiration_date" />
-        <field name="registrant" />
         <field name="nameservers" />
         <field name="ip_address" />
     </whois>
@@ -25,9 +24,8 @@
         <field name="a_records" label="A Records" default="true" />
         <field name="aaaa_records" label="AAAA Records" default="false" />
         <field name="mx_records" label="MX Records" default="true" />
-        <field name="cname_records" label="CNAME Records" default="false" />
+        <field name="cname_records" label="WWW CNAME" default="false" />
         <field name="txt_records" label="TXT Records" default="false" />
-        <field name="registrant" label="Registrant" default="false" />
         <field name="last_updated" label="Last Updated" default="true" />
     </display>
 </config>

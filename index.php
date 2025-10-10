@@ -111,22 +111,13 @@ class DomainTracker {
     }
     
     private function getWhoisData($domain) {
-        // Simple WHOIS implementation using built-in functions
         $whois = [];
         
-        // Try to get basic domain info
-        $context = stream_context_create([
-            'http' => [
-                'timeout' => 10,
-                'user_agent' => 'Domain Tracker 1.0'
-            ]
-        ]);
-        
-        // Get domain registration info (simplified)
+        // Get IP address
         $ip = gethostbyname($domain);
         $whois['ip_address'] = ($ip !== $domain) ? $ip : 'N/A';
         
-        // Try to get nameservers
+        // Get nameservers via DNS
         $ns = dns_get_record($domain, DNS_NS);
         $nameservers = [];
         if ($ns) {
@@ -136,13 +127,156 @@ class DomainTracker {
         }
         $whois['nameservers'] = implode(', ', $nameservers);
         
-        // Simplified registration check
-        $whois['registrar'] = 'N/A';
-        $whois['creation_date'] = 'N/A';
-        $whois['expiration_date'] = 'N/A';
-        $whois['registrant'] = 'N/A';
+        // Get WHOIS data using socket connection
+        $whoisOutput = $this->getWhoisViaSocket($domain);
+        
+        if ($whoisOutput && !empty(trim($whoisOutput))) {
+            $parsedWhois = $this->parseWhoisOutput($whoisOutput);
+            $whois = array_merge($whois, $parsedWhois);
+        } else {
+            // If socket WHOIS fails, set default values
+            $whois['registrar'] = 'N/A (whois unavailable)';
+            $whois['creation_date'] = 'N/A';
+            $whois['expiration_date'] = 'N/A';
+            $whois['registrant'] = 'N/A';
+        }
         
         return $whois;
+    }
+    
+    private function getWhoisViaSocket($domain) {
+        $whoisServers = [
+            'com' => 'whois.verisign-grs.com',
+            'net' => 'whois.verisign-grs.com',
+            'org' => 'whois.pir.org',
+            'info' => 'whois.afilias.net',
+            'biz' => 'whois.neulevel.biz',
+            'name' => 'whois.nic.name',
+            'us' => 'whois.nic.us',
+            'uk' => 'whois.nic.uk',
+            'ca' => 'whois.cira.ca',
+            'au' => 'whois.auda.org.au',
+            'de' => 'whois.denic.de',
+            'fr' => 'whois.nic.fr',
+            'it' => 'whois.nic.it',
+            'nl' => 'whois.domain-registry.nl',
+            'be' => 'whois.dns.be',
+            'eu' => 'whois.eu',
+            'me' => 'whois.nic.me',
+            'io' => 'whois.nic.io',
+            'co' => 'whois.nic.co'
+        ];
+        
+        // Extract TLD from domain
+        $domainParts = explode('.', $domain);
+        $tld = strtolower(end($domainParts));
+        
+        // For .co.uk, .org.uk etc., use the last two parts
+        if (count($domainParts) > 2 && in_array($domainParts[count($domainParts)-2] . '.' . $tld, ['co.uk', 'org.uk', 'ac.uk'])) {
+            $tld = 'uk';
+        }
+        
+        if (!isset($whoisServers[$tld])) {
+            return false;
+        }
+        
+        $whoisServer = $whoisServers[$tld];
+        $port = 43;
+        
+        $connection = @fsockopen($whoisServer, $port, $errno, $errstr, 10);
+        if (!$connection) {
+            return false;
+        }
+        
+        fwrite($connection, $domain . "\r\n");
+        $response = '';
+        while (!feof($connection)) {
+            $response .= fgets($connection, 128);
+        }
+        fclose($connection);
+        
+        // Some servers return redirects to other whois servers
+        if (preg_match('/Whois Server:\s*(.+)/i', $response, $matches)) {
+            $redirectServer = trim($matches[1]);
+            $redirectConnection = @fsockopen($redirectServer, $port, $errno, $errstr, 10);
+            if ($redirectConnection) {
+                fwrite($redirectConnection, $domain . "\r\n");
+                $redirectResponse = '';
+                while (!feof($redirectConnection)) {
+                    $redirectResponse .= fgets($redirectConnection, 128);
+                }
+                fclose($redirectConnection);
+                if (strlen($redirectResponse) > strlen($response)) {
+                    $response = $redirectResponse;
+                }
+            }
+        }
+        
+        return $response;
+    }
+    
+    private function parseWhoisOutput($whoisOutput) {
+        $data = [
+            'registrar' => 'N/A',
+            'creation_date' => 'N/A',
+            'expiration_date' => 'N/A'
+        ];
+        
+        $lines = explode("\n", $whoisOutput);
+        
+        foreach ($lines as $line) {
+            $line = trim($line);
+            
+            // Skip empty lines and comments
+            if (empty($line) || strpos($line, '%') === 0 || strpos($line, '#') === 0) {
+                continue;
+            }
+            
+            // Match different registrar patterns
+            if (preg_match('/(?:Registrar:|Sponsoring Registrar:|Registrar Name:|Registrar IANA ID:|registrar:)\s*(.+)/i', $line, $matches)) {
+                $registrar = trim($matches[1]);
+                if (!empty($registrar) && !preg_match('/^\d+$/', $registrar)) { // Skip IANA IDs
+                    $data['registrar'] = $registrar;
+                }
+            }
+            
+            // Match creation date patterns
+            if (preg_match('/(?:Creation Date:|Created On:|Domain Create Date:|Created:|created:|Record created on|\[登録年月日\]|\[Created on\]|Registration Time:)\s*(.+)/i', $line, $matches)) {
+                $data['creation_date'] = trim($matches[1]);
+            }
+            
+            // Match expiration date patterns
+            if (preg_match('/(?:Registry Expiry Date:|Expiration Date:|Expires On:|Domain Expiration Date:|Expires:|Expiry Date:|expires:|\[有効期限\]|\[Expires on\]|Expiration Time:)\s*(.+)/i', $line, $matches)) {
+                $data['expiration_date'] = trim($matches[1]);
+            }
+        }
+        
+        // Post-processing: Clean up dates
+        if ($data['creation_date'] !== 'N/A') {
+            $data['creation_date'] = $this->formatDate($data['creation_date']);
+        }
+        if ($data['expiration_date'] !== 'N/A') {
+            $data['expiration_date'] = $this->formatDate($data['expiration_date']);
+        }
+        
+        return $data;
+    }
+    
+    private function formatDate($dateString) {
+        // Try to parse and format date consistently
+        $dateString = trim($dateString);
+        
+        // Remove common suffixes
+        $dateString = preg_replace('/\s+(UTC|GMT|Z)$/i', '', $dateString);
+        
+        // Try to parse the date
+        $timestamp = strtotime($dateString);
+        if ($timestamp !== false) {
+            return date('Y-m-d H:i:s', $timestamp);
+        }
+        
+        // If parsing fails, return original
+        return $dateString;
     }
     
     private function getDnsData($domain) {
@@ -179,8 +313,13 @@ class DomainTracker {
             }
             $dns['mx_records'] = implode(', ', $mx_hosts);
             
-            // CNAME records
-            $cname_records = dns_get_record($domain, DNS_CNAME);
+            // CNAME records - check www subdomain if domain doesn't start with www
+            $cname_domain = $domain;
+            if (!preg_match('/^www\./i', $domain)) {
+                $cname_domain = 'www.' . $domain;
+            }
+            
+            $cname_records = dns_get_record($cname_domain, DNS_CNAME);
             $cnames = [];
             if ($cname_records) {
                 foreach ($cname_records as $record) {
@@ -503,10 +642,9 @@ class DomainTracker {
             padding: 4px 6px;
             text-align: left;
             border-bottom: 1px solid #eee;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            max-width: 150px;
+            vertical-align: top;
+            word-wrap: break-word;
+            max-width: 200px;
         }
         
         .table th {
@@ -732,8 +870,26 @@ class DomainTracker {
                 domainsData.fields.forEach(field => {
                     if (visibleFields.has(field.name)) {
                         const td = document.createElement('td');
-                        td.textContent = domain[field.name] || 'N/A';
-                        td.title = domain[field.name] || 'N/A'; // Tooltip for long text
+                        let cellValue = domain[field.name] || 'N/A';
+                        
+                        // Convert comma-separated and semicolon-separated values to new lines
+                        if (cellValue && (cellValue.includes(',') || cellValue.includes(';'))) {
+                            const values = cellValue.split(/[,;]/).map(item => item.trim());
+                            
+                            // Create separate div elements for each value with borders
+                            td.innerHTML = '';
+                            values.forEach((value, index) => {
+                                const valueDiv = document.createElement('div');
+                                valueDiv.textContent = value;
+                                valueDiv.style.padding = '2px 0';
+                                valueDiv.style.borderBottom = index < values.length - 1 ? '1px solid #eee' : 'none';
+                                td.appendChild(valueDiv);
+                            });
+                        } else {
+                            td.textContent = cellValue;
+                        }
+                        
+                        td.title = cellValue; // Tooltip for full text
                         tr.appendChild(td);
                     }
                 });

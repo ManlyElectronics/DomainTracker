@@ -1,15 +1,14 @@
 {
     "domain": true,
-    "ip_address": true,
+    "ip_address": false,
     "registrar": true,
     "creation_date": false,
-    "expiration_date": true,
-    "nameservers": false,
+    "expiration_date": false,
+    "nameservers": true,
     "a_records": true,
-    "aaaa_records": false,
+    "aaaa_records": true,
     "mx_records": true,
-    "cname_records": false,
-    "txt_records": true,
-    "registrant": false,
-    "last_updated": true
+    "cname_records": true,
+    "txt_records": false,
+    "last_updated": false
 }

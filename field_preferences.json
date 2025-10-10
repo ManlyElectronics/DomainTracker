@@ -1,0 +1,15 @@
+{
+    "domain": true,
+    "ip_address": true,
+    "registrar": true,
+    "creation_date": false,
+    "expiration_date": true,
+    "nameservers": false,
+    "a_records": true,
+    "aaaa_records": false,
+    "mx_records": true,
+    "cname_records": false,
+    "txt_records": true,
+    "registrant": false,
+    "last_updated": true
+}

@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<config>
+    <whois>
+        <field name="registrar" />
+        <field name="creation_date" />
+        <field name="expiration_date" />
+        <field name="registrant" />
+        <field name="nameservers" />
+        <field name="ip_address" />
+    </whois>
+    <dns>
+        <field name="a_records" />
+        <field name="aaaa_records" />
+        <field name="mx_records" />
+        <field name="cname_records" />
+        <field name="txt_records" />
+    </dns>
+    <display>
+        <field name="domain" label="Domain" default="true" />
+        <field name="ip_address" label="IP Address" default="true" />
+        <field name="registrar" label="Registrar" default="true" />
+        <field name="creation_date" label="Created" default="false" />
+        <field name="expiration_date" label="Expires" default="true" />
+        <field name="nameservers" label="Name Servers" default="false" />
+        <field name="a_records" label="A Records" default="true" />
+        <field name="aaaa_records" label="AAAA Records" default="false" />
+        <field name="mx_records" label="MX Records" default="true" />
+        <field name="cname_records" label="CNAME Records" default="false" />
+        <field name="txt_records" label="TXT Records" default="false" />
+        <field name="registrant" label="Registrant" default="false" />
+        <field name="last_updated" label="Last Updated" default="true" />
+    </display>
+</config>

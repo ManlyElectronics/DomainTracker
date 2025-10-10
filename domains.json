@@ -1,0 +1,30 @@
+{
+    "rytsk.com": {
+        "registrar": "N\/A",
+        "creation_date": "N\/A",
+        "expiration_date": "N\/A",
+        "registrant": "N\/A",
+        "nameservers": "ns1.aupro2.fcomet.com, ns2.aupro2.fcomet.com",
+        "ip_address": "172.105.178.191",
+        "a_records": "172.105.178.191",
+        "aaaa_records": "",
+        "mx_records": "mx01.mail.icloud.com (10), mx02.mail.icloud.com (10)",
+        "cname_records": "",
+        "txt_records": "openai-domain-verification=dv-JZh7f4JlJTk901j85rfzM1tM; apple-domain=9m5HOFHAfFNPLlSz; v=spf1 +mx +a +include:icloud.com ~all",
+        "last_updated": "2025-10-10 23:24:28"
+    },
+    "rytsk.com.au": {
+        "registrar": "N\/A",
+        "creation_date": "N\/A",
+        "expiration_date": "N\/A",
+        "registrant": "N\/A",
+        "nameservers": "ns-cloud-d1.googledomains.com, ns-cloud-d3.googledomains.com, ns-cloud-d4.googledomains.com, ns-cloud-d2.googledomains.com",
+        "ip_address": "198.185.159.145",
+        "a_records": "198.185.159.145",
+        "aaaa_records": "",
+        "mx_records": "mx01.mail.icloud.com (10), mx02.mail.icloud.com (10)",
+        "cname_records": "",
+        "txt_records": "apple-domain=K18CbpOsFVHC8E4P; v=spf1 include:icloud.com ~all",
+        "last_updated": "2025-10-10 23:23:21"
+    }
+}

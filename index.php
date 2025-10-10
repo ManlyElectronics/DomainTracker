@@ -361,9 +361,6 @@ class DomainTracker {
             'display_fields' => []
         ];
         
-        // Load saved field preferences
-        $savedPreferences = $this->loadFieldPreferences();
-        
         foreach ($xml->whois->field as $field) {
             $config['whois_fields'][] = (string)$field['name'];
         }
@@ -376,13 +373,11 @@ class DomainTracker {
             $fieldName = (string)$field['name'];
             $defaultValue = (string)$field['default'] === 'true';
             
-            // Use saved preference if exists, otherwise use XML default
-            $isDefault = isset($savedPreferences[$fieldName]) ? $savedPreferences[$fieldName] : $defaultValue;
-            
+            // Use XML default directly (no separate preferences file)
             $config['display_fields'][] = [
                 'name' => $fieldName,
                 'label' => (string)$field['label'],
-                'default' => $isDefault
+                'default' => $defaultValue
             ];
         }
         
@@ -475,30 +470,52 @@ class DomainTracker {
     }
     
     private function saveFieldPreferences($fields) {
-        $preferencesFile = 'field_preferences.json';
-        $preferences = [];
+        $configFile = 'config.xml';
+        
+        if (!file_exists($configFile)) {
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'error' => 'Config file not found']);
+            exit;
+        }
+        
+        $xml = simplexml_load_file($configFile);
+        if (!$xml) {
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'error' => 'Could not load XML']);
+            exit;
+        }
         
         // Convert array of field names to associative array with boolean values
         $config = $this->loadConfig();
+        $preferences = [];
         foreach ($config['display_fields'] as $field) {
             $preferences[$field['name']] = in_array($field['name'], $fields);
         }
         
-        file_put_contents($preferencesFile, json_encode($preferences, JSON_PRETTY_PRINT));
+        // Update the default attributes in the display section
+        foreach ($xml->display->field as $field) {
+            $fieldName = (string)$field['name'];
+            if (isset($preferences[$fieldName])) {
+                $field['default'] = $preferences[$fieldName] ? 'true' : 'false';
+            }
+        }
+        
+        // Format and save the XML
+        $dom = new DOMDocument('1.0', 'UTF-8');
+        $dom->formatOutput = true;
+        $dom->preserveWhiteSpace = false;
+        $dom->loadXML($xml->asXML());
+        
+        $success = $dom->save($configFile);
         
         header('Content-Type: application/json');
-        echo json_encode(['success' => true]);
+        echo json_encode(['success' => (bool)$success]);
         exit;
     }
     
     private function loadFieldPreferences() {
-        $preferencesFile = 'field_preferences.json';
-        if (!file_exists($preferencesFile)) {
-            return [];
-        }
-        
-        $json = file_get_contents($preferencesFile);
-        return json_decode($json, true) ?: [];
+        // No longer needed - preferences are read directly from config.xml
+        return [];
     }
     
     private function redirectWithMessage($message, $type, $highlight = '') {

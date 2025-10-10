@@ -668,6 +668,30 @@ class DomainTracker {
             background: #f8f9fa;
             font-weight: 600;
             border-bottom: 1px solid #ddd;
+            cursor: pointer;
+            user-select: none;
+            position: relative;
+        }
+        
+        .table th:hover {
+            background: #e9ecef;
+        }
+        
+        .table th.sortable::after {
+            content: ' ↕';
+            color: #999;
+            font-size: 10px;
+            margin-left: 4px;
+        }
+        
+        .table th.sort-asc::after {
+            content: ' ↑';
+            color: #007acc;
+        }
+        
+        .table th.sort-desc::after {
+            content: ' ↓';
+            color: #007acc;
         }
         
         .table tbody tr:hover {
@@ -769,6 +793,7 @@ class DomainTracker {
     <script>
         let domainsData = null;
         let visibleFields = new Set();
+        let currentSort = { field: null, direction: 'asc' };
         
         async function loadData() {
             try {
@@ -802,6 +827,40 @@ class DomainTracker {
             } catch (error) {
                 document.getElementById('loading').innerHTML = 'Error loading data: ' + error.message;
             }
+        }
+        
+        function sortData(fieldName) {
+            if (currentSort.field === fieldName) {
+                // Toggle direction if same field
+                currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+            } else {
+                // New field, start with ascending
+                currentSort.field = fieldName;
+                currentSort.direction = 'asc';
+            }
+            
+            domainsData.domains.sort((a, b) => {
+                let valueA = a[fieldName] || '';
+                let valueB = b[fieldName] || '';
+                
+                // Convert to strings for comparison
+                valueA = String(valueA).toLowerCase();
+                valueB = String(valueB).toLowerCase();
+                
+                // Handle special cases for dates and numbers
+                if (fieldName.includes('date') || fieldName === 'last_updated') {
+                    valueA = new Date(valueA).getTime() || 0;
+                    valueB = new Date(valueB).getTime() || 0;
+                }
+                
+                let result = 0;
+                if (valueA < valueB) result = -1;
+                else if (valueA > valueB) result = 1;
+                
+                return currentSort.direction === 'asc' ? result : -result;
+            });
+            
+            renderTable();
         }
         
         function renderFieldSelector() {
@@ -859,11 +918,24 @@ class DomainTracker {
             header.innerHTML = '';
             body.innerHTML = '';
             
-            // Add visible field headers
+            // Add visible field headers with click handlers
             domainsData.fields.forEach(field => {
                 if (visibleFields.has(field.name)) {
                     const th = document.createElement('th');
                     th.textContent = field.label;
+                    th.className = 'sortable';
+                    th.setAttribute('data-field', field.name);
+                    
+                    // Add sort indicator
+                    if (currentSort.field === field.name) {
+                        th.classList.add(currentSort.direction === 'asc' ? 'sort-asc' : 'sort-desc');
+                    }
+                    
+                    // Add click handler for sorting
+                    th.addEventListener('click', () => {
+                        sortData(field.name);
+                    });
+                    
                     header.appendChild(th);
                 }
             });
@@ -871,9 +943,20 @@ class DomainTracker {
             // Add time since update header
             const timeTh = document.createElement('th');
             timeTh.textContent = 'Updated';
+            timeTh.className = 'sortable';
+            timeTh.setAttribute('data-field', 'time_since_update');
+            
+            if (currentSort.field === 'time_since_update') {
+                timeTh.classList.add(currentSort.direction === 'asc' ? 'sort-asc' : 'sort-desc');
+            }
+            
+            timeTh.addEventListener('click', () => {
+                sortData('time_since_update');
+            });
+            
             header.appendChild(timeTh);
             
-            // Add actions header
+            // Add actions header (not sortable)
             const actionsTh = document.createElement('th');
             actionsTh.textContent = 'Actions';
             header.appendChild(actionsTh);

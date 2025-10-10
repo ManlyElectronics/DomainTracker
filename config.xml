@@ -20,7 +20,7 @@
     <field name="registrar" label="Registrar" default="true"/>
     <field name="creation_date" label="Created" default="true"/>
     <field name="expiration_date" label="Expires" default="false"/>
-    <field name="nameservers" label="Name Servers" default="false"/>
+    <field name="nameservers" label="Name Servers" default="true"/>
     <field name="a_records" label="A Records" default="true"/>
     <field name="aaaa_records" label="AAAA Records" default="false"/>
     <field name="mx_records" label="MX Records" default="true"/>

@@ -16,16 +16,16 @@
   </dns>
   <display>
     <field name="domain" label="Domain" default="true"/>
-    <field name="ip_address" label="IP Address" default="true"/>
+    <field name="ip_address" label="IP Address" default="false"/>
     <field name="registrar" label="Registrar" default="true"/>
-    <field name="creation_date" label="Created" default="true"/>
+    <field name="creation_date" label="Created" default="false"/>
     <field name="expiration_date" label="Expires" default="false"/>
     <field name="nameservers" label="Name Servers" default="true"/>
     <field name="a_records" label="A Records" default="true"/>
     <field name="aaaa_records" label="AAAA Records" default="false"/>
     <field name="mx_records" label="MX Records" default="true"/>
-    <field name="cname_records" label="WWW CNAME" default="true"/>
-    <field name="txt_records" label="TXT Records" default="false"/>
-    <field name="last_updated" label="Last Updated" default="true"/>
+    <field name="cname_records" label="WWW CNAME" default="false"/>
+    <field name="txt_records" label="TXT Records" default="true"/>
+    <field name="last_updated" label="Last Updated" default="false"/>
   </display>
 </config>

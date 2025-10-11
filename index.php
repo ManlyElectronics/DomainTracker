@@ -23,6 +23,9 @@ class DomainTracker {
             case 'delete':
                 $this->deleteDomain($_GET['domain'] ?? '');
                 break;
+            case 'force_refresh':
+                $this->forceRefreshDomain($_GET['domain'] ?? '');
+                break;
             case 'get_data':
                 header('Content-Type: application/json');
                 echo json_encode($this->getDomainsData());
@@ -55,7 +58,7 @@ class DomainTracker {
             return;
         }
         
-        $domainData = $this->fetchDomainData($domain);
+        $domainData = $this->fetchDomainData($domain, false);
         $domains[$domain] = $domainData;
         $this->saveDomains($domains);
         
@@ -70,11 +73,27 @@ class DomainTracker {
             return;
         }
         
-        $domainData = $this->fetchDomainData($domain);
+        $domainData = $this->fetchDomainData($domain, false);
         $domains[$domain] = $domainData;
         $this->saveDomains($domains);
         
-        $this->redirectWithMessage('Domain refreshed successfully', 'success');
+        $this->redirectWithMessage('Domain refreshed successfully', 'success', $domain);
+    }
+    
+    private function forceRefreshDomain($domain) {
+        $domains = $this->loadDomains();
+        
+        if (!isset($domains[$domain])) {
+            $this->redirectWithMessage('Domain not found', 'error');
+            return;
+        }
+        
+        // Force fresh data retrieval bypassing cache
+        $domainData = $this->fetchDomainData($domain, true);
+        $domains[$domain] = $domainData;
+        $this->saveDomains($domains);
+        
+        $this->redirectWithMessage('Domain force-refreshed (bypassed cache)', 'success', $domain);
     }
     
     private function deleteDomain($domain) {
@@ -89,18 +108,18 @@ class DomainTracker {
         }
     }
     
-    private function fetchDomainData($domain) {
+    private function fetchDomainData($domain, $forceFresh = false) {
         $config = $this->loadConfig();
         $data = [];
         
-        // Fetch WHOIS data
-        $whoisData = $this->getWhoisData($domain);
+        // Fetch WHOIS data (with optional fresh flag)
+        $whoisData = $this->getWhoisData($domain, $forceFresh);
         foreach ($config['whois_fields'] as $field) {
             $data[$field] = $whoisData[$field] ?? 'N/A';
         }
         
-        // Fetch DNS data
-        $dnsData = $this->getDnsData($domain);
+        // Fetch DNS data (with optional fresh flag)
+        $dnsData = $this->getDnsData($domain, $forceFresh);
         foreach ($config['dns_fields'] as $field) {
             $data[$field] = $dnsData[$field] ?? 'N/A';
         }
@@ -110,24 +129,32 @@ class DomainTracker {
         return $data;
     }
     
-    private function getWhoisData($domain) {
+    private function getWhoisData($domain, $forceFresh = false) {
         $whois = [];
         
-        // Get IP address
-        $ip = gethostbyname($domain);
+        // Get IP address (fresh lookup if forced)
+        if ($forceFresh) {
+            $ip = $this->getFreshIpAddress($domain);
+        } else {
+            $ip = gethostbyname($domain);
+        }
         $whois['ip_address'] = ($ip !== $domain) ? $ip : 'N/A';
         
-        // Get nameservers via DNS
-        $ns = dns_get_record($domain, DNS_NS);
-        $nameservers = [];
-        if ($ns) {
-            foreach ($ns as $record) {
-                $nameservers[] = $record['target'];
+        // Get nameservers via DNS (bypass cache if requested)
+        if ($forceFresh) {
+            $nameservers = $this->getFreshNameservers($domain);
+        } else {
+            $ns = dns_get_record($domain, DNS_NS);
+            $nameservers = [];
+            if ($ns) {
+                foreach ($ns as $record) {
+                    $nameservers[] = $record['target'];
+                }
             }
         }
         $whois['nameservers'] = implode(', ', $nameservers);
         
-        // Get WHOIS data using socket connection
+        // Get WHOIS data using socket connection (always fresh)
         $whoisOutput = $this->getWhoisViaSocket($domain);
         
         if ($whoisOutput && !empty(trim($whoisOutput))) {
@@ -215,6 +242,185 @@ class DomainTracker {
         return $response;
     }
     
+    private function getFreshIpAddress($domain) {
+        // Use external DNS to get fresh IP
+        $result = $this->queryExternalDns($domain, 'A', '8.8.8.8');
+        
+        if ($result !== 'N/A') {
+            $ips = explode(', ', $result);
+            return $ips[0]; // Return first IP
+        }
+        
+        return gethostbyname($domain); // Fallback
+    }
+    
+    private function getFreshNameservers($domain) {
+        $result = $this->queryExternalDns($domain, 'NS', '8.8.8.8');
+        
+        if ($result !== 'N/A') {
+            return explode(', ', $result);
+        }
+        
+        return []; // Fallback to empty array
+    }
+    
+    private function queryExternalDns($domain, $recordType, $dnsServer) {
+        $isWindows = strtoupper(substr(PHP_OS, 0, 3)) === 'WIN';
+        
+        if ($isWindows) {
+            // Try multiple nslookup command formats
+            $commands = [
+                "nslookup -type=$recordType $domain $dnsServer 2>&1",
+                "nslookup -q=$recordType $domain $dnsServer 2>&1",
+                "nslookup $domain $dnsServer 2>&1"  // fallback without type
+            ];
+        } else {
+            // Try multiple dig command formats
+            $commands = [
+                "dig @$dnsServer $domain $recordType +short 2>&1",
+                "dig @$dnsServer $domain $recordType 2>&1",
+                "host -t $recordType $domain $dnsServer 2>&1"  // fallback with host
+            ];
+        }
+        
+        foreach ($commands as $command) {
+            $output = shell_exec($command);
+            
+            if ($output && !empty(trim($output))) {
+                // Check if output contains error messages
+                if (!preg_match('/not found|NXDOMAIN|connection timed out|can\'t find/i', $output)) {
+                    $result = $this->parseExternalDnsOutput($output, $recordType, $isWindows);
+                    if ($result !== 'N/A') {
+                        return $result;
+                    }
+                }
+            }
+        }
+        
+        return 'N/A';
+    }
+    
+    private function parseExternalDnsOutput($output, $recordType, $isWindows) {
+        $results = [];
+        $lines = explode("\n", trim($output));
+        
+        if ($isWindows) {
+            // Enhanced nslookup parsing with better pattern matching
+            $foundAnswerSection = false;
+            $inAnswerSection = false;
+            
+            foreach ($lines as $line) {
+                $line = trim($line);
+                
+                // Look for the answer section indicators
+                if (preg_match('/non-authoritative answer|authoritative answer/i', $line)) {
+                    $foundAnswerSection = true;
+                    $inAnswerSection = true;
+                    continue;
+                }
+                
+                // Look for Name: line which indicates start of answer
+                if (preg_match('/^Name:\s*(.+)/i', $line)) {
+                    $inAnswerSection = true;
+                    continue;
+                }
+                
+                // Skip DNS server information lines when not in answer section
+                if (!$inAnswerSection && preg_match('/Server:|Default Server:|Address:/i', $line)) {
+                    continue;
+                }
+                
+                // Skip empty lines and comments
+                if (empty($line) || preg_match('/^[*;#%]/', $line)) {
+                    continue;
+                }
+                
+                switch ($recordType) {
+                    case 'A':
+                        // Multiple patterns for A records
+                        if (preg_match('/Address:\s*(\d+\.\d+\.\d+\.\d+)/', $line, $matches) ||
+                            preg_match('/^(\d+\.\d+\.\d+\.\d+)$/', $line, $matches)) {
+                            $ip = $matches[1];
+                            // Skip DNS server IPs
+                            if (!in_array($ip, ['8.8.8.8', '8.8.4.4', '1.1.1.1', '1.0.0.1', '208.67.222.222', '208.67.220.220'])) {
+                                $results[] = $ip;
+                            }
+                        }
+                        break;
+                        
+                    case 'AAAA':
+                        if (preg_match('/AAAA IPv6 address = (.+)/', $line, $matches) ||
+                            preg_match('/IPv6 address = (.+)/', $line, $matches) ||
+                            preg_match('/Address:\s*([0-9a-fA-F:]+)/', $line, $matches)) {
+                            $results[] = trim($matches[1]);
+                        }
+                        break;
+                        
+                    case 'MX':
+                        if (preg_match('/MX preference = (\d+), mail exchanger = (.+)/', $line, $matches) ||
+                            preg_match('/mail exchanger = (\d+)\s+(.+)/', $line, $matches) ||
+                            preg_match('/(\d+)\s+(.+\.[\w]+)/', $line, $matches)) {
+                            if (isset($matches[2])) {
+                                $results[] = trim($matches[2]) . ' (' . $matches[1] . ')';
+                            }
+                        }
+                        break;
+                        
+                    case 'CNAME':
+                        if (preg_match('/canonical name = (.+)/', $line, $matches) ||
+                            preg_match('/is an alias for (.+)/', $line, $matches) ||
+                            preg_match('/CNAME.*?:\s*(.+)/', $line, $matches)) {
+                            $results[] = trim($matches[1]);
+                        }
+                        break;
+                        
+                    case 'TXT':
+                        if (preg_match('/"(.+)"/', $line, $matches) ||
+                            preg_match('/text = "(.+)"/', $line, $matches) ||
+                            preg_match('/TXT.*?:\s*(.+)/', $line, $matches)) {
+                            $results[] = trim($matches[1], '"');
+                        }
+                        break;
+                        
+                    case 'NS':
+                        if (preg_match('/nameserver = (.+)/', $line, $matches) ||
+                            preg_match('/name server (.+)/', $line, $matches) ||
+                            preg_match('/NS.*?:\s*(.+)/', $line, $matches)) {
+                            $results[] = trim($matches[1]);
+                        }
+                        break;
+                }
+            }
+        } else {
+            // Enhanced dig output parsing
+            foreach ($lines as $line) {
+                $line = trim($line);
+                
+                // Skip comments, empty lines, and dig headers
+                if (empty($line) || preg_match('/^[;#]/', $line) || 
+                    preg_match('/^(\|\||>>|;; )/', $line)) {
+                    continue;
+                }
+                
+                // For A records, filter out DNS server IPs
+                if ($recordType === 'A') {
+                    if (preg_match('/^\d+\.\d+\.\d+\.\d+$/', $line)) {
+                        if (!in_array($line, ['8.8.8.8', '8.8.4.4', '1.1.1.1', '1.0.0.1', '208.67.222.222', '208.67.220.220'])) {
+                            $results[] = $line;
+                        }
+                    }
+                } else {
+                    // For other record types, take the line as-is if it looks valid
+                    if (strlen($line) > 0 && !preg_match('/^[\d\s]+$/', $line)) {
+                        $results[] = $line;
+                    }
+                }
+            }
+        }
+        
+        return empty($results) ? 'N/A' : implode(', ', $results);
+    }
+    
     private function parseWhoisOutput($whoisOutput) {
         $data = [
             'registrar' => 'N/A',
@@ -279,7 +485,107 @@ class DomainTracker {
         return $dateString;
     }
     
-    private function getDnsData($domain) {
+    private function getDnsData($domain, $forceFresh = false) {
+        $dns = [];
+        
+        if ($forceFresh) {
+            // Use external DNS servers to bypass local cache
+            return $this->getDnsDataViaExternalServers($domain);
+        } else {
+            // Original method using PHP's built-in functions
+            return $this->getDnsDataBuiltIn($domain);
+        }
+    }
+    
+    private function getDnsDataViaExternalServers($domain) {
+        $dns = [];
+        $dnsServers = ['8.8.8.8', '1.1.1.1', '208.67.222.222']; // Google, Cloudflare, OpenDNS
+        
+        try {
+            // A records - try multiple DNS servers
+            $dns['a_records'] = $this->queryMultipleDnsServers($domain, 'A', $dnsServers);
+            
+            // AAAA records
+            $dns['aaaa_records'] = $this->queryMultipleDnsServers($domain, 'AAAA', $dnsServers);
+            
+            // MX records
+            $dns['mx_records'] = $this->queryMultipleDnsServers($domain, 'MX', $dnsServers);
+            
+            // CNAME records - check www subdomain if domain doesn't start with www
+            $cname_domain = $domain;
+            if (!preg_match('/^www\./i', $domain)) {
+                $cname_domain = 'www.' . $domain;
+            }
+            $dns['cname_records'] = $this->queryMultipleDnsServers($cname_domain, 'CNAME', $dnsServers);
+            
+            // TXT records
+            $dns['txt_records'] = $this->queryMultipleDnsServers($domain, 'TXT', $dnsServers);
+            
+        } catch (Exception $e) {
+            // Fallback to built-in functions if external queries fail
+            return $this->getDnsDataBuiltIn($domain);
+        }
+        
+        return $dns;
+    }
+    
+    // Query multiple DNS servers until we get a result
+    private function queryMultipleDnsServers($domain, $recordType, $dnsServers) {
+        foreach ($dnsServers as $server) {
+            $result = $this->queryExternalDns($domain, $recordType, $server);
+            if ($result !== 'N/A' && !empty($result)) {
+                return $result;
+            }
+        }
+        
+        // If all external servers failed, fallback to PHP built-in functions
+        return $this->getBuiltInDnsRecord($domain, $recordType);
+    }
+    
+    // Fallback to PHP built-in DNS functions for a specific record type
+    private function getBuiltInDnsRecord($domain, $recordType) {
+        try {
+            switch ($recordType) {
+                case 'A':
+                    $records = dns_get_record($domain, DNS_A);
+                    return !empty($records) ? implode(', ', array_column($records, 'ip')) : 'N/A';
+                    
+                case 'AAAA':
+                    $records = dns_get_record($domain, DNS_AAAA);
+                    return !empty($records) ? implode(', ', array_column($records, 'ipv6')) : 'N/A';
+                    
+                case 'MX':
+                    $records = dns_get_record($domain, DNS_MX);
+                    if (!empty($records)) {
+                        $mx_list = [];
+                        foreach ($records as $record) {
+                            $mx_list[] = $record['target'] . ' (' . $record['pri'] . ')';
+                        }
+                        return implode(', ', $mx_list);
+                    }
+                    return 'N/A';
+                    
+                case 'CNAME':
+                    $records = dns_get_record($domain, DNS_CNAME);
+                    return !empty($records) ? implode(', ', array_column($records, 'target')) : 'N/A';
+                    
+                case 'TXT':
+                    $records = dns_get_record($domain, DNS_TXT);
+                    return !empty($records) ? implode(', ', array_column($records, 'txt')) : 'N/A';
+                    
+                case 'NS':
+                    $records = dns_get_record($domain, DNS_NS);
+                    return !empty($records) ? implode(', ', array_column($records, 'target')) : 'N/A';
+                    
+                default:
+                    return 'N/A';
+            }
+        } catch (Exception $e) {
+            return 'N/A';
+        }
+    }
+    
+    private function getDnsDataBuiltIn($domain) {
         $dns = [];
         
         try {
@@ -701,6 +1007,11 @@ class DomainTracker {
         
         .table tbody tr.highlight {
             background: #fff3cd !important;
+            border-left: 4px solid #ffc107;
+        }
+        
+        .table tbody tr.highlight .value-divider {
+            border-bottom-color: #d4a843 !important;
         }
         
         .actions {
@@ -794,6 +1105,7 @@ class DomainTracker {
         let domainsData = null;
         let visibleFields = new Set();
         let currentSort = { field: null, direction: 'asc' };
+        let highlightedDomain = null;
         
         async function loadData() {
             try {
@@ -821,6 +1133,7 @@ class DomainTracker {
                 // Highlight domain if specified
                 const highlight = '<?= $highlight ?>';
                 if (highlight) {
+                    highlightedDomain = highlight;
                     highlightDomain(highlight);
                 }
                 
@@ -843,14 +1156,20 @@ class DomainTracker {
                 let valueA = a[fieldName] || '';
                 let valueB = b[fieldName] || '';
                 
-                // Convert to strings for comparison
-                valueA = String(valueA).toLowerCase();
-                valueB = String(valueB).toLowerCase();
-                
-                // Handle special cases for dates and numbers
-                if (fieldName.includes('date') || fieldName === 'last_updated') {
-                    valueA = new Date(valueA).getTime() || 0;
-                    valueB = new Date(valueB).getTime() || 0;
+                // Special handling for time_since_update field
+                if (fieldName === 'time_since_update') {
+                    valueA = convertTimeToSeconds(valueA);
+                    valueB = convertTimeToSeconds(valueB);
+                } else {
+                    // Convert to strings for comparison
+                    valueA = String(valueA).toLowerCase();
+                    valueB = String(valueB).toLowerCase();
+                    
+                    // Handle special cases for dates
+                    if (fieldName.includes('date') || fieldName === 'last_updated') {
+                        valueA = new Date(valueA).getTime() || 0;
+                        valueB = new Date(valueB).getTime() || 0;
+                    }
                 }
                 
                 let result = 0;
@@ -861,6 +1180,29 @@ class DomainTracker {
             });
             
             renderTable();
+        }
+        
+        function convertTimeToSeconds(timeString) {
+            if (!timeString || timeString === 'N/A' || timeString === 'Unknown') {
+                return 999999; // Put N/A values at the end
+            }
+            
+            // Parse time strings like "5m ago", "2h ago", "3d ago", "30s ago"
+            const match = timeString.match(/(\d+)([smhd])\s*ago/i);
+            if (!match) {
+                return 999999; // Unknown format, put at end
+            }
+            
+            const value = parseInt(match[1]);
+            const unit = match[2].toLowerCase();
+            
+            switch (unit) {
+                case 's': return value; // seconds
+                case 'm': return value * 60; // minutes to seconds
+                case 'h': return value * 3600; // hours to seconds
+                case 'd': return value * 86400; // days to seconds
+                default: return 999999;
+            }
         }
         
         function renderFieldSelector() {
@@ -966,6 +1308,11 @@ class DomainTracker {
                 const tr = document.createElement('tr');
                 tr.setAttribute('data-domain', domain.domain);
                 
+                // Apply highlighting if this is the highlighted domain
+                if (highlightedDomain === domain.domain) {
+                    tr.classList.add('highlight');
+                }
+                
                 // Add visible field data
                 domainsData.fields.forEach(field => {
                     if (visibleFields.has(field.name)) {
@@ -982,6 +1329,7 @@ class DomainTracker {
                                 const valueDiv = document.createElement('div');
                                 valueDiv.textContent = value;
                                 valueDiv.style.padding = '2px 0';
+                                valueDiv.className = 'value-divider';
                                 valueDiv.style.borderBottom = index < values.length - 1 ? '1px solid #eee' : 'none';
                                 td.appendChild(valueDiv);
                             });
@@ -1003,24 +1351,24 @@ class DomainTracker {
                 const actionsTd = document.createElement('td');
                 actionsTd.innerHTML = `
                     <div class="actions">
-                        <a href="?action=refresh&domain=${encodeURIComponent(domain.domain)}" class="btn btn-small">Refresh</a>
+                        <a href="?action=force_refresh&domain=${encodeURIComponent(domain.domain)}" class="btn btn-small" style="background: #ff6b35; border-color: #ff6b35;" title="Force refresh bypassing cache">Refresh</a>
                         <a href="?action=delete&domain=${encodeURIComponent(domain.domain)}" class="btn btn-small btn-danger" onclick="return confirm('Delete this domain?')">Delete</a>
                     </div>
                 `;
                 tr.appendChild(actionsTd);
-                
-                // Add click handler for refresh (except on action buttons)
-                tr.addEventListener('click', (e) => {
-                    if (!e.target.closest('.actions')) {
-                        window.location.href = `?action=refresh&domain=${encodeURIComponent(domain.domain)}`;
-                    }
-                });
                 
                 body.appendChild(tr);
             });
         }
         
         function highlightDomain(domainName) {
+            // Remove highlight from any previously highlighted domain
+            const previousHighlight = document.querySelector('tr.highlight');
+            if (previousHighlight) {
+                previousHighlight.classList.remove('highlight');
+            }
+            
+            highlightedDomain = domainName;
             setTimeout(() => {
                 const row = document.querySelector(`tr[data-domain="${domainName}"]`);
                 if (row) {

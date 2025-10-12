@@ -3,14 +3,13 @@
         "registrar": "Domain Directors Pty Ltd trading as Instra",
         "creation_date": "N\/A",
         "expiration_date": "N\/A",
-        "nameservers": "ns-1481.awsdns-57.org, ns-690.awsdns-22.net, ns-1652.awsdns-14.co.uk, ns-368.awsdns-46.com",
-        "ip_address": "3.175.115.118, 3.175.115.82, 3.175.115.40",
-        "a_records": "3.175.115.82, 3.175.115.40, 3.175.115.118",
+        "nameservers": "ns-368.awsdns-46.com, ns-690.awsdns-22.net, ns-1481.awsdns-57.org, ns-1652.awsdns-14.co.uk",
+        "a_records": "3.175.115.118, 3.175.115.82, 3.175.115.90, 3.175.115.40",
         "aaaa_records": "Not found",
         "mx_records": "smtp.google.com (1)",
         "cname_records": "Not found",
-        "txt_records": "v=spf1 include:_spf.google.com ~all, detectify-verification=c391a3eafee0f317af36641cdfb37d56, openai-domain-verification=dv-5mBfIcjLAI1lb5wFbboZRBht, google-site-verification=4beXGS7Yfdz_VXtnWYz_Oi7kjqX-0EaRjMofcf83LoI, MS=ms16319136",
-        "last_updated": "2025-10-12 14:35:31"
+        "txt_records": "detectify-verification=c391a3eafee0f317af36641cdfb37d56, openai-domain-verification=dv-5mBfIcjLAI1lb5wFbboZRBht, MS=ms16319136, v=spf1 include:_spf.google.com ~all, google-site-verification=4beXGS7Yfdz_VXtnWYz_Oi7kjqX-0EaRjMofcf83LoI",
+        "last_updated": "2025-10-12 18:14:10"
     },
     "manlyelectronics.com": {
         "registrar": "Amazon Registrar, Inc.",
@@ -68,14 +67,13 @@
         "registrar": "Squarespace Domains II LLC",
         "creation_date": "2006-12-30 23:05:01",
         "expiration_date": "2025-12-30 23:05:01",
-        "nameservers": "ns2.aupro2.fcomet.com, ns1.aupro2.fcomet.com",
-        "ip_address": "172.105.178.191",
+        "nameservers": "ns1.aupro2.fcomet.com, ns2.aupro2.fcomet.com",
         "a_records": "172.105.178.191",
         "aaaa_records": "Not found",
         "mx_records": "mx02.mail.icloud.com (10), mx01.mail.icloud.com (10)",
         "cname_records": "rytsk.com",
-        "txt_records": "v=spf1 +mx +a +include:icloud.com ~all, openai-domain-verification=dv-JZh7f4JlJTk901j85rfzM1tM, apple-domain=9m5HOFHAfFNPLlSz",
-        "last_updated": "2025-10-12 14:21:17"
+        "txt_records": "apple-domain=9m5HOFHAfFNPLlSz, openai-domain-verification=dv-JZh7f4JlJTk901j85rfzM1tM, v=spf1 +mx +a +include:icloud.com ~all",
+        "last_updated": "2025-10-12 15:08:38"
     },
     "feed.net.au": {
         "registrar": "Tucows (Australia) Pty Ltd trading as OpenSRS",
@@ -133,26 +131,12 @@
         "registrar": "Domain Directors Pty Ltd trading as Instra",
         "creation_date": "N\/A",
         "expiration_date": "N\/A",
-        "nameservers": "ns1.syd7.hostingplatform.net.au, ns2.syd7.hostingplatform.net.au",
-        "ip_address": "110.232.143.139",
+        "nameservers": "ns2.syd7.hostingplatform.net.au, ns1.syd7.hostingplatform.net.au",
         "a_records": "110.232.143.139",
         "aaaa_records": "Not found",
         "mx_records": "mail.manlycomputers.au (0)",
         "cname_records": "manlycomputers.au",
-        "txt_records": "v=spf1 +mx +a +ip4:110.232.143.139 +include:spf.hostingplatform.net.au -all, google-site-verification=ezU2wkuq_kcHgNRO1FrjV9zAQNxzLYjbdkrwT8NvEmU",
-        "last_updated": "2025-10-12 14:47:57"
-    },
-    "google.com": {
-        "registrar": "MarkMonitor Inc.",
-        "creation_date": "1997-09-15 14:00:00",
-        "expiration_date": "2028-09-14 14:00:00",
-        "nameservers": "ns4.google.com, ns2.google.com, ns3.google.com, ns1.google.com",
-        "ip_address": "142.251.221.78, 142.250.204.14, 142.250.66.206, 2404:6800:4006:80f::200e, 2404:6800:4006:809::200e",
-        "a_records": "172.217.167.110, 142.250.66.206",
-        "aaaa_records": "2404:6800:4006:80f::200e, 2404:6800:4006:804::200e",
-        "mx_records": "smtp.google.com (10)",
-        "cname_records": "Not found",
-        "txt_records": "docusign=05958488-4752-4ef2-95eb-aa7ba8a3bd0e, google-site-verification=TV9-DBe4R80X4v0M4U_bd_J9cpOJM0nikft0jAgjmsQ, google-site-verification=wD8N7i1JTNTkezJ49swvWW48f8_9xveREV4oB-0Hf5o, docusign=1b0a6754-49b1-4db5-8540-d2c12664b289, onetrust-domain-verification=de01ed21f2fa4d8781cbc3ffb89cf4ef, globalsign-smime-dv=CDYX+XFHUw2wml6\/Gb8+59BsH31KzUr6c1l2BPvqKX8=, apple-domain-verification=30afIBcvSuDV2PLX, facebook-domain-verification=22rm551cu4k0ab0bxsw536tlds4h95, cisco-ci-domain-verification=47c38bc8c4b74b7233e9053220c1bbe76bcc1cd33c7acf7acd36cd6a5332004b, google-site-verification=4ibFUgB-wXLQ_S7vsXVomSTVamuOXBiVAzpR5IZ87D0, v=spf1 include:_spf.google.com ~all, MS=E4A68B9AB2BB9670BCE15412F62916164C0B20BB",
-        "last_updated": "2025-10-12 14:47:35"
+        "txt_records": "google-site-verification=ezU2wkuq_kcHgNRO1FrjV9zAQNxzLYjbdkrwT8NvEmU, v=spf1 +mx +a +ip4:110.232.143.139 +include:spf.hostingplatform.net.au -all",
+        "last_updated": "2025-10-12 15:08:10"
     }
 }

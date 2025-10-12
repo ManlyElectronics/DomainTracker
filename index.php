@@ -114,23 +114,6 @@ class DomainTracker {
     private function getWhoisData($domain, $forceFresh = false) {
         $whois = [];
         
-        // Get IP address (fresh lookup if forced)
-        if ($forceFresh) {
-            $ipResult = $this->getFreshIpAddress($domain);
-            $whois['ip_address'] = $ipResult['value'];
-            $whois['ip_address_fallback'] = $ipResult['fallback'];
-        } else {
-            // Use PHP's dns_get_record to get all A records as fallback
-            $records = dns_get_record($domain, DNS_A);
-            if (!empty($records)) {
-                $ips = array_column($records, 'ip');
-                $whois['ip_address'] = implode(', ', $ips);
-            } else {
-                $whois['ip_address'] = 'N/A';
-            }
-            $whois['ip_address_fallback'] = true;
-        }
-        
         // Get nameservers via DNS (bypass cache if requested)
         if ($forceFresh) {
             $nsResult = $this->getFreshNameservers($domain);
@@ -234,76 +217,6 @@ class DomainTracker {
         }
         
         return $response;
-    }
-    
-    private function getFreshIpAddress($domain) {
-        $allIps = [];
-        $dnsServers = ['8.8.8.8', '1.1.1.1', '208.67.222.222']; // Google, Cloudflare, OpenDNS
-        $hasValidResult = false;
-        
-        // Get IPv4 addresses (A records) from multiple servers
-        foreach ($dnsServers as $server) {
-            $ipv4Result = $this->queryExternalDns($domain, 'A', $server);
-            if ($ipv4Result !== 'N/A' && $ipv4Result !== 'Not found') {
-                $hasValidResult = true;
-                $ips = array_map('trim', explode(',', $ipv4Result));
-                foreach ($ips as $ip) {
-                    if (!empty($ip) && !in_array($ip, $allIps)) {
-                        $allIps[] = $ip;
-                    }
-                }
-            }
-        }
-        
-        // Get IPv6 addresses (AAAA records) from multiple servers
-        foreach ($dnsServers as $server) {
-            $ipv6Result = $this->queryExternalDns($domain, 'AAAA', $server);
-            if ($ipv6Result !== 'N/A' && $ipv6Result !== 'Not found') {
-                $hasValidResult = true;
-                $ips = array_map('trim', explode(',', $ipv6Result));
-                foreach ($ips as $ip) {
-                    if (!empty($ip) && !in_array($ip, $allIps)) {
-                        $allIps[] = $ip;
-                    }
-                }
-            }
-        }
-        
-        // If we got some results, return them
-        if ($hasValidResult && !empty($allIps)) {
-            return ['value' => implode(', ', $allIps), 'fallback' => false];
-        }
-        
-        // Fallback to PHP built-in functions
-        $fallbackIps = [];
-        
-        // Try IPv4 fallback - get all A records
-        $records = dns_get_record($domain, DNS_A);
-        if (!empty($records)) {
-            $ips = array_column($records, 'ip');
-            foreach ($ips as $ip) {
-                if (!in_array($ip, $fallbackIps)) {
-                    $fallbackIps[] = $ip;
-                }
-            }
-        }
-        
-        // Try IPv6 fallback - get all AAAA records
-        $ipv6Records = dns_get_record($domain, DNS_AAAA);
-        if (!empty($ipv6Records)) {
-            $ipv6s = array_column($ipv6Records, 'ipv6');
-            foreach ($ipv6s as $ipv6) {
-                if (!in_array($ipv6, $fallbackIps)) {
-                    $fallbackIps[] = $ipv6;
-                }
-            }
-        }
-        
-        if (!empty($fallbackIps)) {
-            return ['value' => implode(', ', $fallbackIps), 'fallback' => true];
-        }
-        
-        return ['value' => 'N/A', 'fallback' => true];
     }
     
     private function getFreshNameservers($domain) {
@@ -1330,7 +1243,7 @@ class DomainTracker {
         
         .table tbody tr.highlight {
             background: #fff3cd !important;
-            border-left: 4px solid #ffc107;
+            
         }
         
         .table tbody tr.highlight .value-divider {
@@ -1339,7 +1252,7 @@ class DomainTracker {
         
         .fallback-cell {
             background-color: #fff3cd !important;
-            border-left: 3px solid #ffc107 !important;
+            
         }
         
         .fallback-indicator {

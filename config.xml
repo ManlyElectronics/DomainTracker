@@ -5,7 +5,6 @@
     <field name="creation_date"/>
     <field name="expiration_date"/>
     <field name="nameservers"/>
-    <field name="ip_address"/>
   </whois>
   <dns>
     <field name="a_records"/>
@@ -16,10 +15,9 @@
   </dns>
   <display>
     <field name="domain" label="Domain" default="true"/>
-    <field name="ip_address" label="IP Address" default="true"/>
     <field name="registrar" label="Registrar" default="true"/>
-    <field name="creation_date" label="Created" default="true"/>
-    <field name="expiration_date" label="Expires" default="true"/>
+    <field name="creation_date" label="Created" default="false"/>
+    <field name="expiration_date" label="Expires" default="false"/>
     <field name="nameservers" label="Name Servers" default="true"/>
     <field name="a_records" label="A Records" default="true"/>
     <field name="aaaa_records" label="AAAA Records" default="true"/>

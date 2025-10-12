@@ -17,13 +17,10 @@ class DomainTracker {
             case 'add':
                 $this->addDomain($_POST['domain'] ?? '');
                 break;
-            case 'refresh':
-                $this->refreshDomain($_GET['domain'] ?? '');
-                break;
             case 'delete':
                 $this->deleteDomain($_GET['domain'] ?? '');
                 break;
-            case 'force_refresh':
+            case 'refresh':
                 $this->forceRefreshDomain($_GET['domain'] ?? '');
                 break;
             case 'get_data':
@@ -58,26 +55,11 @@ class DomainTracker {
             return;
         }
         
-        $domainData = $this->fetchDomainData($domain, false);
+        $domainData = $this->fetchDomainData($domain, true);
         $domains[$domain] = $domainData;
         $this->saveDomains($domains);
         
         $this->redirectWithMessage('Domain added successfully', 'success');
-    }
-    
-    private function refreshDomain($domain) {
-        $domains = $this->loadDomains();
-        
-        if (!isset($domains[$domain])) {
-            $this->redirectWithMessage('Domain not found', 'error');
-            return;
-        }
-        
-        $domainData = $this->fetchDomainData($domain, false);
-        $domains[$domain] = $domainData;
-        $this->saveDomains($domains);
-        
-        $this->redirectWithMessage('Domain refreshed successfully', 'success', $domain);
     }
     
     private function forceRefreshDomain($domain) {
@@ -93,7 +75,7 @@ class DomainTracker {
         $domains[$domain] = $domainData;
         $this->saveDomains($domains);
         
-        $this->redirectWithMessage('Domain force-refreshed (bypassed cache)', 'success', $domain);
+        $this->redirectWithMessage('Domain refreshed (bypassed cache)', 'success', $domain);
     }
     
     private function deleteDomain($domain) {
@@ -134,15 +116,26 @@ class DomainTracker {
         
         // Get IP address (fresh lookup if forced)
         if ($forceFresh) {
-            $ip = $this->getFreshIpAddress($domain);
+            $ipResult = $this->getFreshIpAddress($domain);
+            $whois['ip_address'] = $ipResult['value'];
+            $whois['ip_address_fallback'] = $ipResult['fallback'];
         } else {
-            $ip = gethostbyname($domain);
+            // Use PHP's dns_get_record to get all A records as fallback
+            $records = dns_get_record($domain, DNS_A);
+            if (!empty($records)) {
+                $ips = array_column($records, 'ip');
+                $whois['ip_address'] = implode(', ', $ips);
+            } else {
+                $whois['ip_address'] = 'N/A';
+            }
+            $whois['ip_address_fallback'] = true;
         }
-        $whois['ip_address'] = ($ip !== $domain) ? $ip : 'N/A';
         
         // Get nameservers via DNS (bypass cache if requested)
         if ($forceFresh) {
-            $nameservers = $this->getFreshNameservers($domain);
+            $nsResult = $this->getFreshNameservers($domain);
+            $whois['nameservers'] = implode(', ', $nsResult['value']);
+            $whois['nameservers_fallback'] = $nsResult['fallback'];
         } else {
             $ns = dns_get_record($domain, DNS_NS);
             $nameservers = [];
@@ -151,8 +144,9 @@ class DomainTracker {
                     $nameservers[] = $record['target'];
                 }
             }
+            $whois['nameservers'] = implode(', ', $nameservers);
+            $whois['nameservers_fallback'] = true;
         }
-        $whois['nameservers'] = implode(', ', $nameservers);
         
         // Get WHOIS data using socket connection (always fresh)
         $whoisOutput = $this->getWhoisViaSocket($domain);
@@ -243,25 +237,83 @@ class DomainTracker {
     }
     
     private function getFreshIpAddress($domain) {
-        // Use external DNS to get fresh IP
-        $result = $this->queryExternalDns($domain, 'A', '8.8.8.8');
+        $allIps = [];
+        $dnsServers = ['8.8.8.8', '1.1.1.1', '208.67.222.222']; // Google, Cloudflare, OpenDNS
+        $hasValidResult = false;
         
-        if ($result !== 'N/A') {
-            $ips = explode(', ', $result);
-            return $ips[0]; // Return first IP
+        // Get IPv4 addresses (A records) from multiple servers
+        foreach ($dnsServers as $server) {
+            $ipv4Result = $this->queryExternalDns($domain, 'A', $server);
+            if ($ipv4Result !== 'N/A' && $ipv4Result !== 'Not found') {
+                $hasValidResult = true;
+                $ips = array_map('trim', explode(',', $ipv4Result));
+                foreach ($ips as $ip) {
+                    if (!empty($ip) && !in_array($ip, $allIps)) {
+                        $allIps[] = $ip;
+                    }
+                }
+            }
         }
         
-        return gethostbyname($domain); // Fallback
+        // Get IPv6 addresses (AAAA records) from multiple servers
+        foreach ($dnsServers as $server) {
+            $ipv6Result = $this->queryExternalDns($domain, 'AAAA', $server);
+            if ($ipv6Result !== 'N/A' && $ipv6Result !== 'Not found') {
+                $hasValidResult = true;
+                $ips = array_map('trim', explode(',', $ipv6Result));
+                foreach ($ips as $ip) {
+                    if (!empty($ip) && !in_array($ip, $allIps)) {
+                        $allIps[] = $ip;
+                    }
+                }
+            }
+        }
+        
+        // If we got some results, return them
+        if ($hasValidResult && !empty($allIps)) {
+            return ['value' => implode(', ', $allIps), 'fallback' => false];
+        }
+        
+        // Fallback to PHP built-in functions
+        $fallbackIps = [];
+        
+        // Try IPv4 fallback - get all A records
+        $records = dns_get_record($domain, DNS_A);
+        if (!empty($records)) {
+            $ips = array_column($records, 'ip');
+            foreach ($ips as $ip) {
+                if (!in_array($ip, $fallbackIps)) {
+                    $fallbackIps[] = $ip;
+                }
+            }
+        }
+        
+        // Try IPv6 fallback - get all AAAA records
+        $ipv6Records = dns_get_record($domain, DNS_AAAA);
+        if (!empty($ipv6Records)) {
+            $ipv6s = array_column($ipv6Records, 'ipv6');
+            foreach ($ipv6s as $ipv6) {
+                if (!in_array($ipv6, $fallbackIps)) {
+                    $fallbackIps[] = $ipv6;
+                }
+            }
+        }
+        
+        if (!empty($fallbackIps)) {
+            return ['value' => implode(', ', $fallbackIps), 'fallback' => true];
+        }
+        
+        return ['value' => 'N/A', 'fallback' => true];
     }
     
     private function getFreshNameservers($domain) {
         $result = $this->queryExternalDns($domain, 'NS', '8.8.8.8');
         
         if ($result !== 'N/A') {
-            return explode(', ', $result);
+            return ['value' => explode(', ', $result), 'fallback' => false];
         }
         
-        return []; // Fallback to empty array
+        return ['value' => [], 'fallback' => true]; // Fallback to empty array
     }
     
     private function queryExternalDns($domain, $recordType, $dnsServer) {
@@ -288,10 +340,83 @@ class DomainTracker {
             
             if ($output && !empty(trim($output))) {
                 // Check if output contains error messages
-                if (!preg_match('/not found|NXDOMAIN|connection timed out|can\'t find/i', $output)) {
-                    $result = $this->parseExternalDnsOutput($output, $recordType, $isWindows);
-                    if ($result !== 'N/A') {
-                        return $result;
+                if (preg_match('/not found|NXDOMAIN|connection timed out|can\'t find/i', $output)) {
+                    continue; // Try next command
+                }
+                
+                $result = $this->parseExternalDnsOutput($output, $recordType, $isWindows);
+                if ($result !== 'N/A') {
+                    return $result;
+                }
+                
+                // If parsing returned N/A, check if this is because no records exist
+                // vs because parsing failed on actual data
+                if ($recordType === 'AAAA') {
+                    // For AAAA, if we get a valid response but no IPv6 addresses, domain has no AAAA
+                    if (preg_match('/Non-authoritative answer|Name:|Address:/i', $output) && 
+                        !preg_match('/[0-9a-fA-F]*:[0-9a-fA-F:]+/', $output)) {
+                        return 'Not found'; // Explicit message that AAAA was checked but not found
+                    }
+                } elseif ($recordType === 'CNAME') {
+                    // For CNAME, if we get SOA data instead of CNAME, subdomain doesn't have CNAME
+                    if (preg_match('/primary name server|responsible mail addr|SOA/i', $output) && 
+                        !preg_match('/canonical name|is an alias for|CNAME/i', $output)) {
+                        return 'Not found';
+                    }
+                } elseif ($recordType === 'MX') {
+                    // For MX, if we get SOA data instead of MX, domain doesn't have MX
+                    if (preg_match('/primary name server|responsible mail addr|SOA/i', $output) && 
+                        !preg_match('/mail exchanger|MX preference/i', $output)) {
+                        return 'Not found';
+                    }
+                } elseif ($recordType === 'TXT') {
+                    // For TXT, if we get SOA data instead of TXT, domain doesn't have TXT
+                    if (preg_match('/primary name server|responsible mail addr|SOA/i', $output) && 
+                        !preg_match('/"[^"]*"|text =|TXT/i', $output)) {
+                        return 'Not found';
+                    }
+                }
+            }
+        }
+        
+        // If all commands failed, return raw output from the first command for debugging
+        // But only if it looks like there might be actual data to parse
+        if (!empty($commands)) {
+            $debugOutput = shell_exec($commands[0]);
+            if ($debugOutput && !empty(trim($debugOutput))) {
+                // Check if this looks like it contains actual record data
+                $hasRecordData = false;
+                if ($recordType === 'AAAA') {
+                    $hasRecordData = preg_match('/[0-9a-fA-F]*:[0-9a-fA-F:]+/', $debugOutput);
+                } elseif ($recordType === 'CNAME') {
+                    $hasRecordData = preg_match('/canonical name|is an alias for|CNAME/i', $debugOutput);
+                } elseif ($recordType === 'MX') {
+                    $hasRecordData = preg_match('/mail exchanger|MX preference/i', $debugOutput);
+                } elseif ($recordType === 'TXT') {
+                    $hasRecordData = preg_match('/"[^"]*"|text =/i', $debugOutput);
+                } elseif ($recordType === 'A') {
+                    $hasRecordData = preg_match('/Address:\s*\d+\.\d+\.\d+\.\d+/', $debugOutput);
+                } else {
+                    // For other record types, check for typical record indicators
+                    $hasRecordData = preg_match('/Address:|preference|canonical|text|nameserver/i', $debugOutput);
+                }
+                
+                // If we got SOA data instead of the requested record type, it means "Not found"
+                if (preg_match('/primary name server|responsible mail addr|SOA/i', $debugOutput) && !$hasRecordData) {
+                    return 'Not found';
+                }
+                
+                if ($hasRecordData) {
+                    $lines = explode("\n", trim($debugOutput));
+                    $cleanLines = [];
+                    foreach ($lines as $line) {
+                        $line = trim($line);
+                        if (!empty($line)) {
+                            $cleanLines[] = $line;
+                        }
+                    }
+                    if (!empty($cleanLines)) {
+                        return 'DEBUG: ' . implode(' | ', array_slice($cleanLines, 0, 5));
                     }
                 }
             }
@@ -349,10 +474,27 @@ class DomainTracker {
                         break;
                         
                     case 'AAAA':
-                        if (preg_match('/AAAA IPv6 address = (.+)/', $line, $matches) ||
-                            preg_match('/IPv6 address = (.+)/', $line, $matches) ||
-                            preg_match('/Address:\s*([0-9a-fA-F:]+)/', $line, $matches)) {
-                            $results[] = trim($matches[1]);
+                        // Enhanced patterns for AAAA records - specifically look for IPv6 format
+                        if (preg_match('/Address:\s*([0-9a-fA-F:]+)/', $line, $matches)) {
+                            $ipv6 = trim($matches[1]);
+                            // More permissive validation: must contain colons and be valid IPv6 format
+                            if (strpos($ipv6, ':') !== false && 
+                                preg_match('/^[0-9a-fA-F:]+$/', $ipv6) && 
+                                !preg_match('/^\d+(\.\d+)*$/', $ipv6)) { // Not IPv4 format
+                                $results[] = $ipv6;
+                            }
+                        } elseif (preg_match('/AAAA IPv6 address = (.+)/', $line, $matches) ||
+                                  preg_match('/IPv6 address = (.+)/', $line, $matches)) {
+                            $ipv6 = trim($matches[1]);
+                            if (strpos($ipv6, ':') !== false && preg_match('/^[0-9a-fA-F:]+$/', $ipv6)) {
+                                $results[] = $ipv6;
+                            }
+                        } elseif (preg_match('/^([0-9a-fA-F:]+)$/', trim($line), $matches)) {
+                            // Handle cases where IPv6 address is on its own line
+                            $ipv6 = trim($matches[1]);
+                            if (strpos($ipv6, ':') !== false && preg_match('/^[0-9a-fA-F:]+$/', $ipv6)) {
+                                $results[] = $ipv6;
+                            }
                         }
                         break;
                         
@@ -409,12 +551,166 @@ class DomainTracker {
                             $results[] = $line;
                         }
                     }
+                } elseif ($recordType === 'AAAA') {
+                    // For AAAA records, validate IPv6 format
+                    if (preg_match('/^[0-9a-fA-F:]+$/', $line) && strpos($line, ':') !== false) {
+                        $results[] = $line;
+                    }
                 } else {
                     // For other record types, take the line as-is if it looks valid
                     if (strlen($line) > 0 && !preg_match('/^[\d\s]+$/', $line)) {
                         $results[] = $line;
                     }
                 }
+            }
+        }
+        
+        // If no results were parsed, check if this is a "no records" case vs parsing failure
+        if (empty($results)) {
+            $outputText = implode(' ', $lines);
+            
+            // Check for explicit "no records" indicators
+            if (preg_match('/No AAAA records|can\'t find.*AAAA|No such type|AAAA record not found/i', $outputText)) {
+                return 'Not found';
+            }
+            
+            // Check for other record type specific messages
+            switch ($recordType) {
+                case 'MX':
+                    if (preg_match('/No MX records|can\'t find.*MX/i', $outputText)) {
+                        return 'Not found';
+                    }
+                    break;
+                case 'CNAME':
+                    if (preg_match('/No CNAME records|can\'t find.*CNAME/i', $outputText)) {
+                        return 'Not found';
+                    }
+                    break;
+                case 'TXT':
+                    if (preg_match('/No TXT records|can\'t find.*TXT/i', $outputText)) {
+                        return 'Not found';
+                    }
+                    break;
+                case 'NS':
+                    if (preg_match('/No NS records|can\'t find.*NS/i', $outputText)) {
+                        return 'Not found';
+                    }
+                    break;
+            }
+            
+            // For AAAA records, if we only see basic response without actual IPv6 data, it means no AAAA records
+            if ($recordType === 'AAAA') {
+                $hasActualData = false;
+                foreach ($lines as $line) {
+                    // Look for actual IPv6-like data (contains colons and hex)
+                    if (preg_match('/[0-9a-fA-F]*:[0-9a-fA-F:]+/', $line)) {
+                        $hasActualData = true;
+                        break;
+                    }
+                }
+                
+                // If no IPv6-like data found, this domain simply doesn't have AAAA records
+                if (!$hasActualData) {
+                    return 'Not found';
+                }
+            }
+            
+            // For CNAME records, check if we got SOA data instead of actual CNAME
+            if ($recordType === 'CNAME') {
+                $hasActualCname = false;
+                $hasSoaData = false;
+                
+                foreach ($lines as $line) {
+                    // Look for actual CNAME data
+                    if (preg_match('/canonical name|is an alias for|CNAME/i', $line)) {
+                        $hasActualCname = true;
+                        break;
+                    }
+                    // Check if we got SOA (Start of Authority) data instead
+                    if (preg_match('/primary name server|responsible mail addr|SOA/i', $line)) {
+                        $hasSoaData = true;
+                    }
+                }
+                
+                // If we got SOA data but no CNAME, the subdomain doesn't have CNAME records
+                if ($hasSoaData && !$hasActualCname) {
+                    return 'Not found';
+                }
+                
+                // If no CNAME-like data found at all
+                if (!$hasActualCname) {
+                    return 'Not found';
+                }
+            }
+            
+            // For MX records, check for similar issues
+            if ($recordType === 'MX') {
+                $hasActualMx = false;
+                $hasSoaData = false;
+                
+                foreach ($lines as $line) {
+                    // Look for actual MX data
+                    if (preg_match('/mail exchanger|MX preference|priority/i', $line)) {
+                        $hasActualMx = true;
+                        break;
+                    }
+                    // Check if we got SOA data instead
+                    if (preg_match('/primary name server|responsible mail addr|SOA/i', $line)) {
+                        $hasSoaData = true;
+                    }
+                }
+                
+                // If we got SOA data but no MX, domain doesn't have MX records
+                if ($hasSoaData && !$hasActualMx) {
+                    return 'Not found';
+                }
+                
+                if (!$hasActualMx) {
+                    return 'Not found';
+                }
+            }
+            
+            // For TXT records, similar logic
+            if ($recordType === 'TXT') {
+                $hasActualTxt = false;
+                $hasSoaData = false;
+                
+                foreach ($lines as $line) {
+                    // Look for actual TXT data (quoted strings)
+                    if (preg_match('/"[^"]*"|text =|TXT/i', $line)) {
+                        $hasActualTxt = true;
+                        break;
+                    }
+                    // Check if we got SOA data instead
+                    if (preg_match('/primary name server|responsible mail addr|SOA/i', $line)) {
+                        $hasSoaData = true;
+                    }
+                }
+                
+                // If we got SOA data but no TXT, domain doesn't have TXT records
+                if ($hasSoaData && !$hasActualTxt) {
+                    return 'Not found';
+                }
+                
+                if (!$hasActualTxt) {
+                    return 'Not found';
+                }
+            }
+            
+            // For other record types or when there seems to be data but parsing failed
+            // Clean up the output and return first few meaningful lines
+            $cleanLines = [];
+            foreach ($lines as $line) {
+                $line = trim($line);
+                if (!empty($line) && 
+                    !preg_match('/^[;#%]/', $line) && 
+                    !preg_match('/Server:|Default Server|Address.*8\.8\.8\.8|Address.*1\.1\.1\.1|Address.*208\.67\.222\.222/i', $line)) {
+                    $cleanLines[] = $line;
+                }
+            }
+            
+            if (!empty($cleanLines)) {
+                return 'RAW: ' . implode(' | ', array_slice($cleanLines, 0, 3));
             }
         }
         
@@ -503,23 +799,33 @@ class DomainTracker {
         
         try {
             // A records - try multiple DNS servers
-            $dns['a_records'] = $this->queryMultipleDnsServers($domain, 'A', $dnsServers);
+            $aResult = $this->queryMultipleDnsServers($domain, 'A', $dnsServers);
+            $dns['a_records'] = $aResult['value'];
+            $dns['a_records_fallback'] = $aResult['fallback'];
             
             // AAAA records
-            $dns['aaaa_records'] = $this->queryMultipleDnsServers($domain, 'AAAA', $dnsServers);
+            $aaaaResult = $this->queryMultipleDnsServers($domain, 'AAAA', $dnsServers);
+            $dns['aaaa_records'] = $aaaaResult['value'];
+            $dns['aaaa_records_fallback'] = $aaaaResult['fallback'];
             
             // MX records
-            $dns['mx_records'] = $this->queryMultipleDnsServers($domain, 'MX', $dnsServers);
+            $mxResult = $this->queryMultipleDnsServers($domain, 'MX', $dnsServers);
+            $dns['mx_records'] = $mxResult['value'];
+            $dns['mx_records_fallback'] = $mxResult['fallback'];
             
             // CNAME records - check www subdomain if domain doesn't start with www
             $cname_domain = $domain;
             if (!preg_match('/^www\./i', $domain)) {
                 $cname_domain = 'www.' . $domain;
             }
-            $dns['cname_records'] = $this->queryMultipleDnsServers($cname_domain, 'CNAME', $dnsServers);
+            $cnameResult = $this->queryMultipleDnsServers($cname_domain, 'CNAME', $dnsServers);
+            $dns['cname_records'] = $cnameResult['value'];
+            $dns['cname_records_fallback'] = $cnameResult['fallback'];
             
             // TXT records
-            $dns['txt_records'] = $this->queryMultipleDnsServers($domain, 'TXT', $dnsServers);
+            $txtResult = $this->queryMultipleDnsServers($domain, 'TXT', $dnsServers);
+            $dns['txt_records'] = $txtResult['value'];
+            $dns['txt_records_fallback'] = $txtResult['fallback'];
             
         } catch (Exception $e) {
             // Fallback to built-in functions if external queries fail
@@ -531,15 +837,32 @@ class DomainTracker {
     
     // Query multiple DNS servers until we get a result
     private function queryMultipleDnsServers($domain, $recordType, $dnsServers) {
+        $allResults = [];
+        $hasValidResult = false;
+        
+        // Query all DNS servers and collect unique results
         foreach ($dnsServers as $server) {
             $result = $this->queryExternalDns($domain, $recordType, $server);
-            if ($result !== 'N/A' && !empty($result)) {
-                return $result;
+            if ($result !== 'N/A' && $result !== 'Not found' && !empty($result)) {
+                $hasValidResult = true;
+                // Split by comma in case one server returns multiple IPs
+                $ips = array_map('trim', explode(',', $result));
+                foreach ($ips as $ip) {
+                    if (!empty($ip) && !in_array($ip, $allResults)) {
+                        $allResults[] = $ip;
+                    }
+                }
             }
         }
         
+        // If we got results from external servers, return them
+        if ($hasValidResult && !empty($allResults)) {
+            return ['value' => implode(', ', $allResults), 'fallback' => false];
+        }
+        
         // If all external servers failed, fallback to PHP built-in functions
-        return $this->getBuiltInDnsRecord($domain, $recordType);
+        $fallbackResult = $this->getBuiltInDnsRecord($domain, $recordType);
+        return ['value' => $fallbackResult, 'fallback' => true];
     }
     
     // Fallback to PHP built-in DNS functions for a specific record type
@@ -548,11 +871,11 @@ class DomainTracker {
             switch ($recordType) {
                 case 'A':
                     $records = dns_get_record($domain, DNS_A);
-                    return !empty($records) ? implode(', ', array_column($records, 'ip')) : 'N/A';
+                    return !empty($records) ? implode(', ', array_column($records, 'ip')) : 'Not found';
                     
                 case 'AAAA':
                     $records = dns_get_record($domain, DNS_AAAA);
-                    return !empty($records) ? implode(', ', array_column($records, 'ipv6')) : 'N/A';
+                    return !empty($records) ? implode(', ', array_column($records, 'ipv6')) : 'Not found';
                     
                 case 'MX':
                     $records = dns_get_record($domain, DNS_MX);
@@ -563,25 +886,25 @@ class DomainTracker {
                         }
                         return implode(', ', $mx_list);
                     }
-                    return 'N/A';
+                    return 'Not found';
                     
                 case 'CNAME':
                     $records = dns_get_record($domain, DNS_CNAME);
-                    return !empty($records) ? implode(', ', array_column($records, 'target')) : 'N/A';
+                    return !empty($records) ? implode(', ', array_column($records, 'target')) : 'Not found';
                     
                 case 'TXT':
                     $records = dns_get_record($domain, DNS_TXT);
-                    return !empty($records) ? implode(', ', array_column($records, 'txt')) : 'N/A';
+                    return !empty($records) ? implode(', ', array_column($records, 'txt')) : 'Not found';
                     
                 case 'NS':
                     $records = dns_get_record($domain, DNS_NS);
-                    return !empty($records) ? implode(', ', array_column($records, 'target')) : 'N/A';
+                    return !empty($records) ? implode(', ', array_column($records, 'target')) : 'Not found';
                     
                 default:
                     return 'N/A';
             }
         } catch (Exception $e) {
-            return 'N/A';
+            return 'ERROR: ' . $e->getMessage();
         }
     }
     
@@ -856,11 +1179,11 @@ class DomainTracker {
             font-size: 12px;
             line-height: 1.2;
             background-color: #f5f5f5;
-            color: #333;
+            color: #000000ff;
         }
         
         .container {
-            max-width: 1400px;
+            width: 100%;
             margin: 0 auto;
             padding: 10px;
         }
@@ -967,7 +1290,7 @@ class DomainTracker {
             border-bottom: 1px solid #eee;
             vertical-align: top;
             word-wrap: break-word;
-            max-width: 200px;
+            min-width: 80px;
         }
         
         .table th {
@@ -1012,6 +1335,50 @@ class DomainTracker {
         
         .table tbody tr.highlight .value-divider {
             border-bottom-color: #d4a843 !important;
+        }
+        
+        .fallback-cell {
+            background-color: #fff3cd !important;
+            border-left: 3px solid #ffc107 !important;
+        }
+        
+        .fallback-indicator {
+            color: #856404;
+            font-size: 9px;
+            font-style: italic;
+            display: block;
+            margin-top: 2px;
+        }
+        
+        .raw-data {
+            background-color: #f8f9fa !important;
+            border-left: 3px solid #6c757d !important;
+            font-family: 'Courier New', monospace;
+            font-size: 10px;
+            color: #495057;
+        }
+        
+        .debug-data {
+            background-color: #e2e3e5 !important;
+            border-left: 3px solid #6c757d !important;
+            font-family: 'Courier New', monospace;
+            font-size: 10px;
+            color: #495057;
+        }
+        
+        .error-data {
+            background-color: #f8d7da !important;
+            border-left: 3px solid #dc3545 !important;
+            font-family: 'Courier New', monospace;
+            font-size: 10px;
+            color: #721c24;
+        }
+        
+        .no-records {
+            background-color: #e7f3ff !important;
+            
+            font-style: italic;
+            color: #004085;
         }
         
         .actions {
@@ -1318,6 +1685,26 @@ class DomainTracker {
                     if (visibleFields.has(field.name)) {
                         const td = document.createElement('td');
                         let cellValue = domain[field.name] || 'N/A';
+                        const fallbackKey = field.name + '_fallback';
+                        const isFallback = domain[fallbackKey] === true;
+                        
+                        // Apply fallback styling if needed
+                        if (isFallback) {
+                            td.classList.add('fallback-cell');
+                        }
+                        
+                        // Apply special styling for raw/debug/error data
+                        if (typeof cellValue === 'string') {
+                            if (cellValue.startsWith('RAW: ')) {
+                                td.classList.add('raw-data');
+                            } else if (cellValue.startsWith('DEBUG: ')) {
+                                td.classList.add('debug-data');
+                            } else if (cellValue.startsWith('ERROR: ')) {
+                                td.classList.add('error-data');
+                            } else if (cellValue === 'Not found') {
+                                td.classList.add('no-records');
+                            }
+                        }
                         
                         // Convert comma-separated and semicolon-separated values to new lines
                         if (cellValue && (cellValue.includes(',') || cellValue.includes(';'))) {
@@ -1333,11 +1720,27 @@ class DomainTracker {
                                 valueDiv.style.borderBottom = index < values.length - 1 ? '1px solid #eee' : 'none';
                                 td.appendChild(valueDiv);
                             });
+                            
+                            // Add fallback indicator if needed
+                            if (isFallback) {
+                                const fallbackDiv = document.createElement('div');
+                                fallbackDiv.className = 'fallback-indicator';
+                                fallbackDiv.textContent = '(cached)';
+                                td.appendChild(fallbackDiv);
+                            }
                         } else {
                             td.textContent = cellValue;
+                            
+                            // Add fallback indicator if needed
+                            if (isFallback) {
+                                const fallbackSpan = document.createElement('span');
+                                fallbackSpan.className = 'fallback-indicator';
+                                fallbackSpan.textContent = ' (cached)';
+                                td.appendChild(fallbackSpan);
+                            }
                         }
                         
-                        td.title = cellValue; // Tooltip for full text
+                        td.title = cellValue + (isFallback ? ' (from local cache)' : ' (fresh from external DNS)'); // Tooltip for full text
                         tr.appendChild(td);
                     }
                 });
@@ -1351,7 +1754,7 @@ class DomainTracker {
                 const actionsTd = document.createElement('td');
                 actionsTd.innerHTML = `
                     <div class="actions">
-                        <a href="?action=force_refresh&domain=${encodeURIComponent(domain.domain)}" class="btn btn-small" style="background: #ff6b35; border-color: #ff6b35;" title="Force refresh bypassing cache">Refresh</a>
+                        <a href="?action=refresh&domain=${encodeURIComponent(domain.domain)}" class="btn btn-small" style="background: #28a745; border-color: #28a745;" title="Refresh data bypassing cache">Refresh</a>
                         <a href="?action=delete&domain=${encodeURIComponent(domain.domain)}" class="btn btn-small btn-danger" onclick="return confirm('Delete this domain?')">Delete</a>
                     </div>
                 `;

@@ -13,6 +13,7 @@ class DomainTracker {
     
     private $domainsFile = 'domains.json';
     private $configFile = 'config.xml';
+    private $propertiesFile = 'properties.json';
     
     public function __construct() {
         $this->handleRequest();
@@ -38,6 +39,22 @@ class DomainTracker {
             case 'save_fields':
                 $this->saveFieldPreferences($_POST['fields'] ?? []);
                 break;
+            case 'add_property':
+                $this->addProperty($_POST['property_name'] ?? '');
+                break;
+            case 'delete_property':
+                $this->deleteProperty($_GET['property'] ?? '');
+                break;
+            case 'assign_property':
+                $this->assignProperty($_POST['domain'] ?? '', $_POST['property'] ?? '');
+                break;
+            case 'remove_property':
+                $this->removeProperty($_POST['domain'] ?? '', $_POST['property'] ?? '');
+                break;
+            case 'get_properties':
+                header('Content-Type: application/json');
+                echo json_encode($this->getProperties());
+                exit;
             default:
                 $this->displayInterface();
         }
@@ -95,8 +112,9 @@ class DomainTracker {
             return;
         }
         
-        // Force fresh data retrieval bypassing cache
-        $domainData = $this->fetchDomainData($domain, true);
+        // Force fresh data retrieval bypassing cache, preserving existing properties
+        $existingData = $domains[$domain];
+        $domainData = $this->fetchDomainData($domain, true, $existingData);
         $domains[$domain] = $domainData;
         $this->saveDomains($domains);
         
@@ -121,9 +139,140 @@ class DomainTracker {
         }
     }
     
-    private function fetchDomainData($domain, $forceFresh = false) {
+    private function addProperty($propertyName) {
+        $propertyName = trim($propertyName);
+        
+        // Validate property name - alphanumeric only, max 256 chars
+        if (empty($propertyName)) {
+            $this->redirectWithMessage('Property name cannot be empty', 'error');
+            return;
+        }
+        
+        if (!preg_match('/^[a-zA-Z0-9\s\-_]+$/', $propertyName)) {
+            $this->redirectWithMessage('Property name can only contain alphanumeric characters, spaces, hyphens, and underscores', 'error');
+            return;
+        }
+        
+        if (strlen($propertyName) > 256) {
+            $this->redirectWithMessage('Property name cannot exceed 256 characters', 'error');
+            return;
+        }
+        
+        $properties = $this->loadProperties();
+        
+        if (in_array($propertyName, $properties)) {
+            $this->redirectWithMessage('Property already exists', 'warning');
+            return;
+        }
+        
+        $properties[] = $propertyName;
+        $this->saveProperties($properties);
+        
+        $this->redirectWithMessage('Property added successfully', 'success');
+    }
+    
+    private function deleteProperty($propertyName) {
+        $properties = $this->loadProperties();
+        
+        $key = array_search($propertyName, $properties);
+        if ($key !== false) {
+            unset($properties[$key]);
+            $properties = array_values($properties); // Reindex array
+            $this->saveProperties($properties);
+            
+            // Remove this property from all domains
+            $domains = $this->loadDomains();
+            foreach ($domains as $domainName => $domainData) {
+                if (isset($domainData['properties']) && in_array($propertyName, $domainData['properties'])) {
+                    $domainKey = array_search($propertyName, $domainData['properties']);
+                    unset($domainData['properties'][$domainKey]);
+                    $domainData['properties'] = array_values($domainData['properties']);
+                    $domains[$domainName] = $domainData;
+                }
+            }
+            $this->saveDomains($domains);
+            
+            $this->redirectWithMessage('Property deleted successfully', 'success');
+        } else {
+            $this->redirectWithMessage('Property not found', 'error');
+        }
+    }
+    
+    private function assignProperty($domain, $propertyName) {
+        if (!$this->isValidDomain($domain)) {
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'message' => 'Invalid domain format']);
+            exit;
+        }
+        
+        $domains = $this->loadDomains();
+        $properties = $this->loadProperties();
+        
+        if (!isset($domains[$domain])) {
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'message' => 'Domain not found']);
+            exit;
+        }
+        
+        if (!in_array($propertyName, $properties)) {
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'message' => 'Property not found']);
+            exit;
+        }
+        
+        // Initialize properties array if not exists
+        if (!isset($domains[$domain]['properties'])) {
+            $domains[$domain]['properties'] = [];
+        }
+        
+        // Add property if not already assigned
+        if (!in_array($propertyName, $domains[$domain]['properties'])) {
+            $domains[$domain]['properties'][] = $propertyName;
+            $this->saveDomains($domains);
+        }
+        
+        header('Content-Type: application/json');
+        echo json_encode(['success' => true, 'message' => 'Property assigned successfully']);
+        exit;
+    }
+    
+    private function removeProperty($domain, $propertyName) {
+        if (!$this->isValidDomain($domain)) {
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'message' => 'Invalid domain format']);
+            exit;
+        }
+        
+        $domains = $this->loadDomains();
+        
+        if (!isset($domains[$domain])) {
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'message' => 'Domain not found']);
+            exit;
+        }
+        
+        if (isset($domains[$domain]['properties'])) {
+            $key = array_search($propertyName, $domains[$domain]['properties']);
+            if ($key !== false) {
+                unset($domains[$domain]['properties'][$key]);
+                $domains[$domain]['properties'] = array_values($domains[$domain]['properties']);
+                $this->saveDomains($domains);
+            }
+        }
+        
+        header('Content-Type: application/json');
+        echo json_encode(['success' => true, 'message' => 'Property removed successfully']);
+        exit;
+    }
+    
+    private function fetchDomainData($domain, $forceFresh = false, $existingData = null) {
         $config = $this->loadConfig();
         $data = [];
+        
+        // Preserve existing properties if they exist
+        if ($existingData && isset($existingData['properties'])) {
+            $data['properties'] = $existingData['properties'];
+        }
         
         // Fetch WHOIS data (with optional fresh flag)
         $whoisData = $this->getWhoisData($domain, $forceFresh);
@@ -1027,6 +1176,23 @@ class DomainTracker {
         file_put_contents($this->domainsFile, json_encode($domains, JSON_PRETTY_PRINT));
     }
     
+    private function loadProperties() {
+        if (!file_exists($this->propertiesFile)) {
+            return [];
+        }
+        
+        $json = file_get_contents($this->propertiesFile);
+        return json_decode($json, true) ?: [];
+    }
+    
+    private function saveProperties($properties) {
+        file_put_contents($this->propertiesFile, json_encode($properties, JSON_PRETTY_PRINT));
+    }
+    
+    private function getProperties() {
+        return $this->loadProperties();
+    }
+    
     private function getDomainsData() {
         $domains = $this->loadDomains();
         $config = $this->loadConfig();
@@ -1038,6 +1204,13 @@ class DomainTracker {
         
         foreach ($domains as $domain => $data) {
             $domainData = ['domain' => $domain] + $data;
+            
+            // Format properties as a comma-separated string for display
+            if (isset($data['properties']) && is_array($data['properties'])) {
+                $domainData['properties'] = implode(', ', $data['properties']);
+            } else {
+                $domainData['properties'] = '';
+            }
             
             // Calculate time since last update
             if (isset($data['last_updated'])) {
@@ -1217,6 +1390,42 @@ class DomainTracker {
             <h3>Display Fields</h3>
             <div class="field-checkboxes" id="fieldCheckboxes"></div>
         </div>
+        
+        <div class="property-manager">
+            <h3>Property Management</h3>
+            
+            <!-- Add new property -->
+            <div class="property-add-section">
+                <form method="post" action="?action=add_property" class="property-form">
+                    <input type="text" name="property_name" placeholder="Enter property name (e.g., 'to transfer')" maxlength="256" required>
+                    <button type="submit" class="btn btn-small">Add Property</button>
+                </form>
+            </div>
+            
+            <!-- Property list -->
+            <div class="property-list">
+                <h4>Available Properties</h4>
+                <div id="propertyList" class="property-tags"></div>
+            </div>
+            
+            <!-- Domain selection and assignment -->
+            <div class="domain-assignment" id="domainAssignment" style="display: none;">
+                <h4>Assign Property to: <span id="selectedDomainName"></span></h4>
+                <div class="assignment-controls">
+                    <select id="propertySelect">
+                        <option value="">Select a property...</option>
+                    </select>
+                    <button type="button" class="btn btn-small" onclick="assignPropertyToDomain()">Assign</button>
+                    <button type="button" class="btn btn-small btn-danger" onclick="clearDomainSelection()">Cancel</button>
+                </div>
+                
+                <!-- Currently assigned properties -->
+                <div class="assigned-properties">
+                    <h5>Currently Assigned Properties:</h5>
+                    <div id="assignedPropertyList" class="assigned-property-tags"></div>
+                </div>
+            </div>
+        </div>
     </div>
     
     <script>
@@ -1224,6 +1433,8 @@ class DomainTracker {
         let visibleFields = new Set();
         let currentSort = { field: null, direction: 'asc' };
         let highlightedDomain = null;
+        let selectedDomain = null;
+        let propertiesData = [];
         
         async function loadData() {
             try {
@@ -1239,6 +1450,7 @@ class DomainTracker {
                 
                 renderFieldSelector();
                 renderTable();
+                loadProperties();
                 
                 document.getElementById('loading').style.display = 'none';
                 
@@ -1511,6 +1723,15 @@ class DomainTracker {
                 `;
                 tr.appendChild(actionsTd);
                 
+                // Add click event for domain selection
+                tr.addEventListener('click', (e) => {
+                    // Don't trigger selection if clicking on action buttons
+                    if (e.target.tagName === 'A' || e.target.tagName === 'BUTTON') {
+                        return;
+                    }
+                    selectDomain(domain.domain);
+                });
+                
                 body.appendChild(tr);
             });
         }
@@ -1530,6 +1751,187 @@ class DomainTracker {
                     row.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 }
             }, 100);
+        }
+        
+        // Property Management Functions
+        async function loadProperties() {
+            try {
+                const response = await fetch('?action=get_properties');
+                propertiesData = await response.json();
+                renderProperties();
+                updatePropertySelect();
+            } catch (error) {
+                console.error('Error loading properties:', error);
+            }
+        }
+        
+        function renderProperties() {
+            const propertyList = document.getElementById('propertyList');
+            propertyList.innerHTML = '';
+            
+            if (propertiesData.length === 0) {
+                propertyList.innerHTML = '<div class="empty-properties">No properties defined yet.</div>';
+                return;
+            }
+            
+            propertiesData.forEach(property => {
+                const tag = document.createElement('div');
+                tag.className = 'property-tag';
+                tag.innerHTML = `
+                    <span>${property}</span>
+                    <button class="delete-btn" onclick="deleteProperty('${property}')" title="Delete property">×</button>
+                `;
+                propertyList.appendChild(tag);
+            });
+        }
+        
+        function updatePropertySelect() {
+            const select = document.getElementById('propertySelect');
+            select.innerHTML = '<option value="">Select a property...</option>';
+            
+            propertiesData.forEach(property => {
+                const option = document.createElement('option');
+                option.value = property;
+                option.textContent = property;
+                select.appendChild(option);
+            });
+        }
+        
+        function selectDomain(domainName) {
+            // Remove previous selection
+            const previousSelected = document.querySelector('tr.selected');
+            if (previousSelected) {
+                previousSelected.classList.remove('selected');
+            }
+            
+            // Add selection to clicked row
+            const row = document.querySelector(`tr[data-domain="${domainName}"]`);
+            if (row) {
+                row.classList.add('selected');
+            }
+            
+            selectedDomain = domainName;
+            document.getElementById('selectedDomainName').textContent = domainName;
+            document.getElementById('domainAssignment').style.display = 'block';
+            
+            // Load current properties for this domain
+            renderAssignedProperties();
+        }
+        
+        function clearDomainSelection() {
+            const previousSelected = document.querySelector('tr.selected');
+            if (previousSelected) {
+                previousSelected.classList.remove('selected');
+            }
+            
+            selectedDomain = null;
+            document.getElementById('domainAssignment').style.display = 'none';
+        }
+        
+        function renderAssignedProperties() {
+            const assignedList = document.getElementById('assignedPropertyList');
+            assignedList.innerHTML = '';
+            
+            if (!selectedDomain || !domainsData) return;
+            
+            const domain = domainsData.domains.find(d => d.domain === selectedDomain);
+            if (!domain || !domain.properties || domain.properties.length === 0) {
+                assignedList.innerHTML = '<div class="empty-properties">No properties assigned.</div>';
+                return;
+            }
+            
+            const properties = domain.properties.split(', ').filter(p => p.trim());
+            
+            properties.forEach(property => {
+                const tag = document.createElement('div');
+                tag.className = 'assigned-property-tag';
+                tag.innerHTML = `
+                    <span>${property}</span>
+                    <button class="remove-btn" onclick="removePropertyFromDomain('${property}')" title="Remove property">×</button>
+                `;
+                assignedList.appendChild(tag);
+            });
+        }
+        
+        async function assignPropertyToDomain() {
+            const propertySelect = document.getElementById('propertySelect');
+            const property = propertySelect.value;
+            
+            if (!property || !selectedDomain) {
+                alert('Please select a property');
+                return;
+            }
+            
+            try {
+                const formData = new FormData();
+                formData.append('domain', selectedDomain);
+                formData.append('property', property);
+                
+                const response = await fetch('?action=assign_property', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    // Refresh data to show updated properties
+                    await loadData();
+                    renderAssignedProperties();
+                } else {
+                    alert('Error: ' + result.message);
+                }
+            } catch (error) {
+                alert('Error assigning property: ' + error.message);
+            }
+        }
+        
+        async function removePropertyFromDomain(property) {
+            if (!selectedDomain) return;
+            
+            try {
+                const formData = new FormData();
+                formData.append('domain', selectedDomain);
+                formData.append('property', property);
+                
+                const response = await fetch('?action=remove_property', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    // Refresh data to show updated properties
+                    await loadData();
+                    renderAssignedProperties();
+                } else {
+                    alert('Error: ' + result.message);
+                }
+            } catch (error) {
+                alert('Error removing property: ' + error.message);
+            }
+        }
+        
+        async function deleteProperty(property) {
+            if (!confirm(`Delete property "${property}"? This will remove it from all domains.`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`?action=delete_property&property=${encodeURIComponent(property)}`);
+                
+                // Check if this was a successful redirect or error
+                if (response.redirected) {
+                    // Page was redirected, reload to show updated state
+                    window.location.reload();
+                } else {
+                    // Handle error case
+                    alert('Error deleting property');
+                }
+            } catch (error) {
+                alert('Error deleting property: ' + error.message);
+            }
         }
         
         // Load data when page loads

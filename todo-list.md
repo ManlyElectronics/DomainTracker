@@ -1,10 +1,13 @@
 # Domain Tracker - Local Optimization Todo List
-##
-- add domain grouping
-    defining a custom property limited by 256 alphanumeric (example: to transfer or on account 1
-showing list of properties added/to select from below the table and in additional column next to domain
-    select domain by clicking on it
-    assign a property
+
+## Domain Management
+- [x] **Domain Grouping System** - COMPLETED
+  - [x] Custom properties limited to 256 alphanumeric characters
+  - [x] Property management interface below the table
+  - [x] Properties column in domain table
+  - [x] Domain selection by clicking on table rows
+  - [x] Property assignment and removal functionality
+  - [x] Property deletion with cleanup from all domains
 
 ## Bulk Domain Operations
 - [ ] Add bulk import functionality for domain lists
@@ -12,8 +15,8 @@ showing list of properties added/to select from below the table and in additiona
 - [ ] Add progress indicator for bulk operations
 
 ## Interface Improvements
-- [ ] Add search/filter functionality
-- [ ] Implement domain grouping/categorization
+- [ ] Add search/filter functionality by domain name and properties
+- [ ] Add filter by property functionality
 - [ ] Add export format options (JSON, CSV, XML)
 
 ## Error Handling & Recovery
@@ -70,8 +73,9 @@ showing list of properties added/to select from below the table and in additiona
 - `styles.css` - Styling (already extracted)
 - `config.xml` - Field configuration
 - `domains.json` - Domain data storage
+- `properties.json` - Property definitions storage
 
 ---
 
-*Last Updated: October 12, 2025*
+*Last Updated: October 14, 2025*
 *Priority: Local development optimization*

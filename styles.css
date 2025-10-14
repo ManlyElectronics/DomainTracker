@@ -261,3 +261,160 @@ body {
     color: #666;
     font-style: italic;
 }
+
+/* Property Management Styles */
+.property-manager {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    padding: 10px;
+    margin-top: 10px;
+}
+
+.property-manager h3 {
+    font-size: 12px;
+    margin-bottom: 8px;
+    color: #333;
+}
+
+.property-manager h4 {
+    font-size: 11px;
+    margin-bottom: 6px;
+    color: #666;
+}
+
+.property-manager h5 {
+    font-size: 10px;
+    margin-bottom: 4px;
+    color: #666;
+}
+
+.property-add-section {
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #eee;
+}
+
+.property-form {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.property-form input[type="text"] {
+    padding: 4px 6px;
+    border: 1px solid #ccc;
+    border-radius: 2px;
+    font-size: 11px;
+    width: 250px;
+}
+
+.property-list {
+    margin-bottom: 15px;
+}
+
+.property-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    min-height: 30px;
+    border: 1px dashed #ddd;
+    padding: 8px;
+    border-radius: 3px;
+}
+
+.property-tag {
+    background: #e9ecef;
+    border: 1px solid #adb5bd;
+    padding: 2px 6px;
+    border-radius: 2px;
+    font-size: 10px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.property-tag .delete-btn {
+    color: #dc3545;
+    cursor: pointer;
+    font-weight: bold;
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: 12px;
+}
+
+.property-tag .delete-btn:hover {
+    color: #b02a5b;
+}
+
+.domain-assignment {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 3px;
+    padding: 10px;
+    margin-top: 10px;
+}
+
+.assignment-controls {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.assignment-controls select {
+    padding: 4px 6px;
+    border: 1px solid #ccc;
+    border-radius: 2px;
+    font-size: 11px;
+    width: 200px;
+}
+
+.assigned-properties {
+    margin-top: 10px;
+}
+
+.assigned-property-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    min-height: 25px;
+}
+
+.assigned-property-tag {
+    background: #d1ecf1;
+    border: 1px solid #bee5eb;
+    padding: 2px 6px;
+    border-radius: 2px;
+    font-size: 10px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.assigned-property-tag .remove-btn {
+    color: #dc3545;
+    cursor: pointer;
+    font-weight: bold;
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: 12px;
+}
+
+.assigned-property-tag .remove-btn:hover {
+    color: #b02a5b;
+}
+
+.table tbody tr.selected {
+    background: #cce5ff !important;
+    border-left: 3px solid #007acc !important;
+}
+
+.empty-properties {
+    color: #999;
+    font-style: italic;
+    font-size: 10px;
+    padding: 5px 0;
+}

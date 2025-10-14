@@ -9,7 +9,10 @@
         "mx_records": "smtp.google.com (1)",
         "cname_records": "Not found",
         "txt_records": "detectify-verification=c391a3eafee0f317af36641cdfb37d56, MS=ms16319136, openai-domain-verification=dv-5mBfIcjLAI1lb5wFbboZRBht, google-site-verification=4beXGS7Yfdz_VXtnWYz_Oi7kjqX-0EaRjMofcf83LoI, v=spf1 include:_spf.google.com ~all",
-        "last_updated": "2025-10-12 18:41:01"
+        "last_updated": "2025-10-12 18:41:01",
+        "properties": [
+            "MeGsuite"
+        ]
     },
     "manlyelectronics.com": {
         "registrar": "Amazon Registrar, Inc.",
@@ -107,7 +110,10 @@
         "mx_records": "smtp.google.com (1)",
         "cname_records": "Not found",
         "txt_records": "v=spf1 include:_spf.google.com ~all, google-site-verification=_ri3PHRfErllSYYL4m27U3JfE5cVZ6TUDLXwHwnKiwo",
-        "last_updated": "2025-10-12 14:48:07"
+        "last_updated": "2025-10-12 14:48:07",
+        "properties": [
+            "MeGsuite"
+        ]
     },
     "manlycomputers.com": {
         "registrar": "Amazon Registrar, Inc.",
@@ -119,7 +125,10 @@
         "mx_records": "aspmx3.googlemail.com (10), alt2.aspmx.l.google.com (10), aspmx.l.google.com (1), aspmx2.googlemail.com (10), alt1.aspmx.l.google.com (5)",
         "cname_records": "Not found",
         "txt_records": "v=spf1 include:_spf.google.com ~all, google-site-verification=8X48SEGzVnpGZnYhYhM_TMd61jJ3RXaRMkba2R6aX3E",
-        "last_updated": "2025-10-12 19:20:23"
+        "last_updated": "2025-10-12 19:20:23",
+        "properties": [
+            "MeGsuite"
+        ]
     },
     "manlycomputers.au": {
         "registrar": "Domain Directors Pty Ltd trading as Instra",
@@ -137,25 +146,31 @@
         "registrar": "Squarespace Domains II LLC",
         "creation_date": "2007-06-10 16:53:26",
         "expiration_date": "2026-06-10 16:53:26",
-        "nameservers": "ns-cloud-b4.googledomains.com, ns-cloud-b2.googledomains.com, ns-cloud-b3.googledomains.com, ns-cloud-b1.googledomains.com",
+        "nameservers": "ns-cloud-b4.googledomains.com, ns-cloud-b2.googledomains.com, ns-cloud-b1.googledomains.com, ns-cloud-b3.googledomains.com",
         "a_records": "198.49.23.144",
         "aaaa_records": "Not found",
-        "mx_records": "alt2.aspmx.l.google.com (5), alt3.aspmx.l.google.com (10), alt4.aspmx.l.google.com (10), alt1.aspmx.l.google.com (5), aspmx.l.google.com (1)",
+        "mx_records": "alt4.aspmx.l.google.com (10), alt2.aspmx.l.google.com (5), alt3.aspmx.l.google.com (10), alt1.aspmx.l.google.com (5), aspmx.l.google.com (1)",
         "cname_records": "ext-sq.squarespace.com",
         "txt_records": "v=spf1 include:_spf.google.com ~all",
-        "last_updated": "2025-10-14 12:29:02"
+        "last_updated": "2025-10-14 12:50:32",
+        "properties": [
+            "MeGsuite"
+        ]
     },
     "manlycomputer.com.au": {
+        "properties": [
+            "MeGsuite"
+        ],
         "registrar": "Domain Directors Pty Ltd trading as Instra",
         "creation_date": "N\/A",
         "expiration_date": "N\/A",
         "nameservers": "ns-1473.awsdns-56.org, ns-1609.awsdns-09.co.uk, ns-721.awsdns-26.net, ns-478.awsdns-59.com",
-        "a_records": "3.175.115.50, 3.175.115.98, 3.175.115.115, 3.175.115.97",
+        "a_records": "3.175.115.50, 3.175.115.115, 3.175.115.98, 3.175.115.97",
         "aaaa_records": "Not found",
-        "mx_records": "aspmx2.googlemail.com (10), aspmx3.googlemail.com (10), alt2.aspmx.l.google.com (10), aspmx.l.google.com (1), alt1.aspmx.l.google.com (5)",
+        "mx_records": "aspmx2.googlemail.com (10), alt2.aspmx.l.google.com (10), alt1.aspmx.l.google.com (5), aspmx.l.google.com (1), aspmx3.googlemail.com (10)",
         "cname_records": "Not found",
         "txt_records": "google-site-verification=gadG-Xp3hM7z5L66JAegoJ4nm6DtSXcQjoTDgjnviQ0, v=spf1 include:_spf.google.com ~all",
-        "last_updated": "2025-10-14 12:29:17"
+        "last_updated": "2025-10-14 12:53:46"
     },
     "manlyelectronics.au": {
         "registrar": "Domain Directors Pty Ltd trading as Instra",
@@ -167,7 +182,10 @@
         "mx_records": "alt4.aspmx.l.google.com (10), alt1.aspmx.l.google.com (5), alt2.aspmx.l.google.com (5), aspmx.l.google.com (1), alt3.aspmx.l.google.com (10)",
         "cname_records": "ext-sq.squarespace.com",
         "txt_records": "v=spf1 include:_spf.google.com ~all, google-site-verification=aEyERQfTB2dYI3mv2bit6t26aV1T7Q9QzXvaCEPvIvs",
-        "last_updated": "2025-10-14 12:29:45"
+        "last_updated": "2025-10-14 12:29:45",
+        "properties": [
+            "MeGsuite"
+        ]
     },
     "russianit.com.au": {
         "registrar": "Web Address Registration Pty Ltd",
@@ -179,6 +197,9 @@
         "mx_records": "alt1.aspmx.l.google.com (5), alt2.aspmx.l.google.com (5), alt4.aspmx.l.google.com (10), alt3.aspmx.l.google.com (10), aspmx.l.google.com (1)",
         "cname_records": "Not found",
         "txt_records": "google-site-verification=oLE9mVUCSRZR5vlyCwao1dsxq5WnbFxa5sB4Ryv1tQQ, v=spf1 include:_spf.google.com ~all",
-        "last_updated": "2025-10-14 12:29:51"
+        "last_updated": "2025-10-14 12:29:51",
+        "properties": [
+            "MeGsuite"
+        ]
     }
 }

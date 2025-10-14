@@ -15,6 +15,7 @@
   </dns>
   <display>
     <field name="domain" label="Domain" default="true"/>
+    <field name="properties" label="Properties" default="true"/>
     <field name="registrar" label="Registrar" default="true"/>
     <field name="creation_date" label="Created" default="false"/>
     <field name="expiration_date" label="Expires" default="false"/>

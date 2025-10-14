@@ -1,0 +1,17 @@
+# Domain data files (user-specific data)
+domains.json
+
+# Property data files (user-specific data)  
+properties.json
+
+# Temporary files
+*.tmp
+*.log
+
+# IDE files
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db

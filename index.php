@@ -3,6 +3,14 @@ error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
 class DomainTracker {
+    // Security and validation constants
+    private const MAX_DOMAIN_LENGTH = 253;
+    private const MAX_LABEL_LENGTH = 63;
+    private const MIN_TLD_LENGTH = 2;
+    private const WHOIS_PORT = 43;
+    private const WHOIS_TIMEOUT = 10;
+    private const DNS_TIMEOUT = 5;
+    
     private $domainsFile = 'domains.json';
     private $configFile = 'config.xml';
     
@@ -36,14 +44,25 @@ class DomainTracker {
     }
     
     private function addDomain($domain) {
+        // Sanitize and normalize domain input
         $domain = trim(strtolower($domain));
+        
+        // Remove protocol if present
+        $domain = preg_replace('#^https?://#', '', $domain);
+        
+        // Remove trailing slashes and paths
+        $domain = preg_replace('#/.*$#', '', $domain);
+        
+        // Remove trailing dots
+        $domain = rtrim($domain, '.');
+        
         if (empty($domain)) {
             $this->redirectWithMessage('Please enter a domain name', 'error');
             return;
         }
         
-        // Validate domain format
-        if (!filter_var('http://' . $domain, FILTER_VALIDATE_URL)) {
+        // Validate domain format with improved validation
+        if (!$this->isValidDomain($domain)) {
             $this->redirectWithMessage('Invalid domain format', 'error');
             return;
         }
@@ -63,6 +82,12 @@ class DomainTracker {
     }
     
     private function forceRefreshDomain($domain) {
+        // Validate domain input to prevent injection
+        if (!$this->isValidDomain($domain)) {
+            $this->redirectWithMessage('Invalid domain format', 'error');
+            return;
+        }
+        
         $domains = $this->loadDomains();
         
         if (!isset($domains[$domain])) {
@@ -79,6 +104,12 @@ class DomainTracker {
     }
     
     private function deleteDomain($domain) {
+        // Validate domain input to prevent injection
+        if (!$this->isValidDomain($domain)) {
+            $this->redirectWithMessage('Invalid domain format', 'error');
+            return;
+        }
+        
         $domains = $this->loadDomains();
         
         if (isset($domains[$domain])) {
@@ -185,10 +216,11 @@ class DomainTracker {
         }
         
         $whoisServer = $whoisServers[$tld];
-        $port = 43;
         
-        $connection = @fsockopen($whoisServer, $port, $errno, $errstr, 10);
+        $connection = @fsockopen($whoisServer, self::WHOIS_PORT, $errno, $errstr, self::WHOIS_TIMEOUT);
         if (!$connection) {
+            // Log error for debugging
+            error_log("WHOIS connection failed for $domain: $errstr ($errno)");
             return false;
         }
         
@@ -202,7 +234,7 @@ class DomainTracker {
         // Some servers return redirects to other whois servers
         if (preg_match('/Whois Server:\s*(.+)/i', $response, $matches)) {
             $redirectServer = trim($matches[1]);
-            $redirectConnection = @fsockopen($redirectServer, $port, $errno, $errstr, 10);
+            $redirectConnection = @fsockopen($redirectServer, self::WHOIS_PORT, $errno, $errstr, self::WHOIS_TIMEOUT);
             if ($redirectConnection) {
                 fwrite($redirectConnection, $domain . "\r\n");
                 $redirectResponse = '';
@@ -230,6 +262,22 @@ class DomainTracker {
     }
     
     private function queryExternalDns($domain, $recordType, $dnsServer) {
+        // Validate inputs first for security
+        if (!$this->isValidDomain($domain)) {
+            return 'Invalid domain';
+        }
+        
+        // Validate record type (whitelist approach)
+        $validRecordTypes = ['A', 'AAAA', 'MX', 'CNAME', 'TXT', 'NS'];
+        if (!in_array($recordType, $validRecordTypes)) {
+            return 'Invalid record type';
+        }
+        
+        // Validate DNS server IP
+        if (!filter_var($dnsServer, FILTER_VALIDATE_IP)) {
+            return 'Invalid DNS server';
+        }
+        
         $isWindows = strtoupper(substr(PHP_OS, 0, 3)) === 'WIN';
         
         if ($isWindows) {
@@ -254,6 +302,8 @@ class DomainTracker {
             if ($output && !empty(trim($output))) {
                 // Check if output contains error messages
                 if (preg_match('/not found|NXDOMAIN|connection timed out|can\'t find/i', $output)) {
+                    // Log failed DNS query for debugging
+                    error_log("DNS query failed for $domain ($recordType): " . trim($output));
                     continue; // Try next command
                 }
                 
@@ -1069,6 +1119,58 @@ class DomainTracker {
         exit;
     }
     
+    private function isValidDomain($domain) {
+        // Remove protocol if present
+        $domain = preg_replace('#^https?://#', '', $domain);
+        
+        // Remove trailing dots and whitespace
+        $domain = trim($domain, '. ');
+        
+        // Check if empty after cleaning
+        if (empty($domain)) {
+            return false;
+        }
+        
+        // Check length (RFC 1035: max 253 characters)
+        if (strlen($domain) > self::MAX_DOMAIN_LENGTH) {
+            return false;
+        }
+        
+        // Check for valid characters and format
+        // Domains can contain letters, numbers, hyphens, and dots
+        // Cannot start or end with hyphen, cannot have consecutive dots
+        if (!preg_match('/^[a-z0-9]([a-z0-9\-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9\-]*[a-z0-9])?)*$/i', $domain)) {
+            return false;
+        }
+        
+        // Check that it has at least one dot (TLD required)
+        if (strpos($domain, '.') === false) {
+            return false;
+        }
+        
+        // Split into labels and validate each
+        $labels = explode('.', $domain);
+        foreach ($labels as $label) {
+            // Each label must be 1-63 characters
+            if (strlen($label) < 1 || strlen($label) > self::MAX_LABEL_LENGTH) {
+                return false;
+            }
+            
+            // Label cannot start or end with hyphen
+            if ($label[0] === '-' || substr($label, -1) === '-') {
+                return false;
+            }
+        }
+        
+        // Check that TLD is at least 2 characters and not all numeric
+        $tld = end($labels);
+        if (strlen($tld) < self::MIN_TLD_LENGTH || is_numeric($tld)) {
+            return false;
+        }
+        
+        return true;
+    }
+    
     private function displayInterface() {
         $message = $_GET['msg'] ?? '';
         $messageType = $_GET['type'] ?? '';
@@ -1080,271 +1182,7 @@ class DomainTracker {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Domain Tracker</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            font-size: 12px;
-            line-height: 1.2;
-            background-color: #f5f5f5;
-            color: #000000ff;
-        }
-        
-        .container {
-            width: 100%;
-            margin: 0 auto;
-            padding: 10px;
-        }
-        
-        .header {
-            background: #fff;
-            padding: 10px;
-            margin-bottom: 10px;
-            border: 1px solid #ddd;
-            border-radius: 3px;
-        }
-        
-        .header h1 {
-            font-size: 16px;
-            margin-bottom: 8px;
-        }
-        
-        .add-form {
-            display: flex;
-            gap: 8px;
-            align-items: center;
-        }
-        
-        .add-form input[type="text"] {
-            padding: 4px 6px;
-            border: 1px solid #ccc;
-            border-radius: 2px;
-            font-size: 12px;
-            width: 200px;
-        }
-        
-        .btn {
-            padding: 4px 8px;
-            border: 1px solid #007acc;
-            background: #007acc;
-            color: white;
-            border-radius: 2px;
-            cursor: pointer;
-            font-size: 11px;
-            text-decoration: none;
-            display: inline-block;
-        }
-        
-        .btn:hover {
-            background: #005a9e;
-        }
-        
-        .btn-danger {
-            background: #d63384;
-            border-color: #d63384;
-        }
-        
-        .btn-danger:hover {
-            background: #b02a5b;
-        }
-        
-        .btn-small {
-            padding: 2px 5px;
-            font-size: 10px;
-        }
-        
-        .message {
-            padding: 6px 10px;
-            margin-bottom: 10px;
-            border-radius: 2px;
-            font-size: 11px;
-        }
-        
-        .message.success {
-            background: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
-        
-        .message.error {
-            background: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
-        
-        .message.warning {
-            background: #fff3cd;
-            color: #856404;
-            border: 1px solid #ffeaa7;
-        }
-        
-        .table-container {
-            background: #fff;
-            border: 1px solid #ddd;
-            border-radius: 3px;
-            margin-bottom: 10px;
-        }
-        
-        .table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 11px;
-        }
-        
-        .table th,
-        .table td {
-            padding: 4px 6px;
-            text-align: left;
-            border-bottom: 1px solid #eee;
-            vertical-align: top;
-            word-wrap: break-word;
-            min-width: 80px;
-        }
-        
-        .table th {
-            background: #f8f9fa;
-            font-weight: 600;
-            border-bottom: 1px solid #ddd;
-            cursor: pointer;
-            user-select: none;
-            position: relative;
-        }
-        
-        .table th:hover {
-            background: #e9ecef;
-        }
-        
-        .table th.sortable::after {
-            content: ' ↕';
-            color: #999;
-            font-size: 10px;
-            margin-left: 4px;
-        }
-        
-        .table th.sort-asc::after {
-            content: ' ↑';
-            color: #007acc;
-        }
-        
-        .table th.sort-desc::after {
-            content: ' ↓';
-            color: #007acc;
-        }
-        
-        .table tbody tr:hover {
-            background: #f8f9fa;
-            cursor: pointer;
-        }
-        
-        .table tbody tr.highlight {
-            background: #fff3cd !important;
-            
-        }
-        
-        .table tbody tr.highlight .value-divider {
-            border-bottom-color: #d4a843 !important;
-        }
-        
-        .fallback-cell {
-            background-color: #fff3cd !important;
-            
-        }
-        
-        .fallback-indicator {
-            color: #856404;
-            font-size: 9px;
-            font-style: italic;
-            display: block;
-            margin-top: 2px;
-        }
-        
-        .raw-data {
-            background-color: #f8f9fa !important;
-            border-left: 3px solid #6c757d !important;
-            font-family: 'Courier New', monospace;
-            font-size: 10px;
-            color: #495057;
-        }
-        
-        .debug-data {
-            background-color: #e2e3e5 !important;
-            border-left: 3px solid #6c757d !important;
-            font-family: 'Courier New', monospace;
-            font-size: 10px;
-            color: #495057;
-        }
-        
-        .error-data {
-            background-color: #f8d7da !important;
-            border-left: 3px solid #dc3545 !important;
-            font-family: 'Courier New', monospace;
-            font-size: 10px;
-            color: #721c24;
-        }
-        
-        .no-records {
-            background-color: #e7f3ff !important;
-            
-            font-style: italic;
-            color: #004085;
-        }
-        
-        .actions {
-            display: flex;
-            gap: 4px;
-        }
-        
-        .loading {
-            text-align: center;
-            padding: 20px;
-            color: #666;
-        }
-        
-        .field-selector {
-            background: #fff;
-            border: 1px solid #ddd;
-            border-radius: 3px;
-            padding: 10px;
-        }
-        
-        .field-selector h3 {
-            font-size: 12px;
-            margin-bottom: 8px;
-        }
-        
-        .field-checkboxes {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-            gap: 5px;
-        }
-        
-        .field-checkbox {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-        }
-        
-        .field-checkbox input[type="checkbox"] {
-            margin: 0;
-        }
-        
-        .field-checkbox label {
-            font-size: 11px;
-            cursor: pointer;
-        }
-        
-        .no-data {
-            text-align: center;
-            padding: 30px;
-            color: #666;
-            font-style: italic;
-        }
-    </style>
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <div class="container">

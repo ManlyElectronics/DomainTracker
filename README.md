@@ -66,6 +66,8 @@ Fetches and stores WHOIS data, DNS records (A, AAAA, MX, CNAME, TXT), and allows
    http://localhost:8000
    ```
 
+**Note:** The `domains.json` and `properties.json` files are created automatically when you add your first domain. No manual setup required!
+
 ### File Structure
 ```
 domain-tracker/

@@ -1,5 +1,7 @@
 # Domain Tracker - Local Optimization Todo List
 
+
+
 ## Domain Management
 - [x] **Domain Grouping System** - COMPLETED
   - [x] Custom properties limited to 256 alphanumeric characters
@@ -15,8 +17,6 @@
 - [ ] Add progress indicator for bulk operations
 
 ## Interface Improvements
-- [ ] Add search/filter functionality by domain name and properties
-- [ ] Add filter by property functionality
 - [ ] Add export format options (JSON, CSV, XML)
 
 ## Error Handling & Recovery
@@ -35,12 +35,12 @@
 
 ## Low Priority (Polish & Optional)
 
-### 8. Security Enhancements (Optional for Local Use)
+### Security Enhancements (Optional for Local Use)
 - [ ] Add rate limiting for rapid refreshes (optional)
 - [ ] Add data integrity checks for JSON files
 - [ ] Simplify validation for local-only use
 
-### 9. Code Optimizations
+### Code Optimizations
 - [ ] Simplify error handling for local development
 - [ ] Add basic whitelist validation for record types
 - [ ] Implement timeout commands for shell queries

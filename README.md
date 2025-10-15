@@ -5,21 +5,19 @@ A PHP-based domain management tool for tracking and organizing domains with cust
 > [!IMPORTANT]
 > **Security Notice:** This script is for LOCAL use only. Do not publish it on public domains or publicly accessible servers.
 
-Fetches and stores WHOIS data, DNS records (A, AAAA, MX, CNAME, TXT), and allows grouping domains using customizable property tags - all stored locally in JSON files.
+Fetches and stores WHOIS data, DNS records (A, AAAA, MX, CNAME, TXT), and allows grouping domains using customizable property tags - all stored locally in JSON files. Script does not use external libraries.
 
 ![Domain Tracker Screenshot](Screenshot%202025-10-15%20181427.png)
 *Screenshot showing domain tracking with property management, sortable columns, and field visibility controls*
 
 
 ### Quick Start
-Start index.php and styles.css in your local server folder 
-
-Script does not use external libraries. Fetching accessing only whois 
+Copy index.php and styles.css to your local server folder. 
 
 Open folder as a webpage.
 
 
-**Note:** The `domains.json` and `properties.json` files are created in the same folder when you add your first domain and properties. No manual setup required.
+**Note:** The `domains.json` and `properties.json` files are created in the same folder when you add your first domain.
 
 No database or manual file setup is required.
 

@@ -85,7 +85,8 @@ Invalid property names:
 - **Record Type Whitelisting**: Only allowed DNS record types processed
 - **Local-optimized Security**: Designed for secure local development use
 
-### File Structure
+## File Structure
+```
 domain-tracker/
 ├── index.php           # Main application file
 ├── styles.css          # CSS styling
@@ -94,6 +95,7 @@ domain-tracker/
 ├── properties.json     # Custom properties storage. Generated.
 ├── todo-list.md        # Development roadmap
 └── README.md           # This file
+```
 
 ## Technical Details
 

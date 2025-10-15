@@ -10,51 +10,9 @@ Fetches and stores WHOIS data, DNS records (A, AAAA, MX, CNAME, TXT), and allows
 ![Domain Tracker Screenshot](Screenshot%202025-10-15%20181427.png)
 *Screenshot showing domain tracking with property management, sortable columns, and field visibility controls*
 
-
-### Quick Start
-Copy index.php and styles.css to your local server folder. 
-
-Open folder as a webpage.
-
-
-**Note:** The `domains.json` and `properties.json` files are created in the same folder when you add your first domain.
-
-No database or manual file setup is required.
-
-## Features
-
-### **Domain Monitoring**
-- **WHOIS Data Tracking**: Registrar, creation/expiration dates, nameservers
-- **DNS Records**: A, AAAA, MX, CNAME, TXT records
-- **Multi-Server DNS Querying**: Google DNS (8.8.8.8), Cloudflare (1.1.1.1), OpenDNS (208.67.222.222) with fallback
-- **IPv6 Support**: IPv6 address parsing and validation
-- **Cache Indicators**: Visual indicators for cached vs fresh DNS data
-- **Automatic Refresh**: Force refresh individual domains bypassing cache
-
-### **Property Management System**
-- **Custom Properties**: Create custom tags/categories (max 256 alphanumeric characters)
-- **Domain Grouping**: Assign multiple properties to domains for organization
-- **Click-to-Select**: Select domains by clicking table rows
-- **Property Assignment**: Interface for assigning/removing properties
-- **Persistent Properties**: Properties preserved during domain refreshes
-- **Bulk Property Management**: Add, edit, and delete properties across all domains
-
-### **User Interface**
-- **Responsive Design**: Mobile and desktop compatible interface
-- **Sortable Columns**: Click column headers to sort data
-- **Field Visibility**: Toggle display of specific data fields
-- **AJAX Updates**: Asynchronous property management
-- **Color-coded Indicators**: Visual feedback for data freshness and fallback status
-- **Domain Selection**: Table-based domain identification and selection
-
-### **Security Features**
-- **Input Validation**: Domain name validation (RFC compliant)
-- **Data Sanitization**: Protection against malicious input
-- **DNS Server Validation**: Whitelisted DNS servers for external queries
-- **Record Type Whitelisting**: Only allowed DNS record types processed
-- **Local-optimized Security**: Designed for secure local development use
-
 ## Installation
+Copy index.php and styles.css to your local server folder. 
+Open folder as a webpage.
 
 ### Requirements
 - PHP 7.4+ (tested with PHP 8.2)
@@ -62,19 +20,9 @@ No database or manual file setup is required.
 - JSON extension (typically included)
 - Network access for DNS/WHOIS queries
 
+**Note:** The `domains.json` and `properties.json` files are created in the same folder when you add your first domain.
 
-
-### File Structure
-```
-domain-tracker/
-├── index.php           # Main application file
-├── styles.css          # CSS styling
-├── config.xml          # Field configuration
-├── domains.json        # Domain data storage
-├── properties.json     # Custom properties storage
-├── todo-list.md        # Development roadmap
-└── README.md           # This file
-```
+No database or manual file setup is required.
 
 ## Usage
 
@@ -96,8 +44,6 @@ domain-tracker/
 - **Sorting**: Click column headers to sort by any field
 
 ### Property Examples
-```
-Good property names:
 - "To Transfer"
 - "Account 1" 
 - "Production Sites"
@@ -108,7 +54,46 @@ Invalid property names:
 - Special characters: @#$%
 - Too long: >256 characters
 - Empty names
-```
+
+## Features
+
+### **Domain Monitoring**
+- **WHOIS Data Tracking**: Registrar, creation/expiration dates, nameservers
+- **DNS Records**: A, AAAA, MX, CNAME, TXT records
+- **Multi-Server DNS Querying**: Google DNS (8.8.8.8), Cloudflare (1.1.1.1), OpenDNS (208.67.222.222) with fallback
+- **IPv6 Support**: IPv6 address parsing and validation
+- **ARefresh**: Fetching individual domains bypassing cache
+
+### **Property Management System**
+- **Custom Properties**: Create custom tags/categories (max 256 alphanumeric characters)
+- **Domain Grouping**: Assign multiple properties to domains
+- **Click-to-Select**: Select domains by clicking table rows
+- **Persistent Properties**: Properties preserved during domain refreshes
+- **Bulk Property Management**: Add, edit, and delete properties across all domains
+
+### **User Interface**
+- **Responsive Design**: Mobile and desktop compatible interface
+- **Sortable Columns**: Click column headers to sort data
+- **Field Visibility**: Toggle display of specific data fields
+- **AJAX Updates**: Asynchronous property management
+- **Domain Selection**: Table-based domain identification and selection
+
+### **Security Features**
+- **Input Validation**: Domain name validation (RFC compliant)
+- **Data Sanitization**: Protection against malicious input
+- **DNS Server Validation**: Whitelisted DNS servers for external queries
+- **Record Type Whitelisting**: Only allowed DNS record types processed
+- **Local-optimized Security**: Designed for secure local development use
+
+### File Structure
+domain-tracker/
+├── index.php           # Main application file
+├── styles.css          # CSS styling
+├── config.xml          # Field configuration
+├── domains.json        # Domain data storage. Generated when domain added.
+├── properties.json     # Custom properties storage. Generated.
+├── todo-list.md        # Development roadmap
+└── README.md           # This file
 
 ## Technical Details
 
@@ -159,16 +144,6 @@ private const DNS_SERVERS = [
     '1.1.1.1',     // Cloudflare
     '208.67.222.222' // OpenDNS
 ];
-```
-
-## Development Roadmap
-
-See `todo-list.md` for planned features:
-- [ ] Bulk domain import/export
-- [ ] Search and filtering functionality
-- [ ] Property-based filtering
-- [ ] Enhanced export formats (CSV, JSON, XML)
-- [ ] Automated monitoring and alerts
 
 ## Contributing
 

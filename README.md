@@ -2,10 +2,25 @@
 
 A PHP-based domain management tool for tracking and organizing domains with custom properties.
 
+Script is for the LOCAL use only. Do not publish it on public domains.
+
 Fetches and stores WHOIS data, DNS records (A, AAAA, MX, CNAME, TXT), and allows grouping domains using customizable property tags - all stored locally in JSON files.
 
 ![Domain Tracker Screenshot](Screenshot%202025-10-15%20181427.png)
 *Screenshot showing domain tracking with property management, sortable columns, and field visibility controls*
+
+
+### Quick Start
+Start index.php and styles.css in your local server folder 
+
+Script does not use external libraries. Fetching accessing only whois 
+
+Open folder as a webpage.
+
+
+**Note:** The `domains.json` and `properties.json` files are created in the same folder when you add your first domain and properties. No manual setup required.
+
+No database or manual file setup is required.
 
 ## Features
 
@@ -48,34 +63,7 @@ Fetches and stores WHOIS data, DNS records (A, AAAA, MX, CNAME, TXT), and allows
 - JSON extension (typically included)
 - Network access for DNS/WHOIS queries
 
-### Quick Start
 
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/yourusername/domain-tracker.git
-   cd domain-tracker
-   ```
-
-2. **Start the PHP development server:**
-   ```bash
-   php -S localhost:8000
-   ```
-
-3. **Open in browser:**
-   ```
-   http://localhost:8000
-   ```
-
-**Note:** The `domains.json` and `properties.json` files are created automatically when you add your first domain. No manual setup required!
-
-### Quick Deployment
-
-You can deploy Domain Tracker on any PHP-capable server:
-1. Copy `index.php` and `styles.css` (and optionally `config.xml`) to a folder on your server.
-2. Open the application in your browser.
-3. Add at least one domain using the form—`domains.json` and `properties.json` will be created automatically (no need to create them manually).
-
-No database or manual file setup is required.
 
 ### File Structure
 ```

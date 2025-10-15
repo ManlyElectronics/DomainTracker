@@ -1,7 +1,7 @@
 # Domain Tracker
 
 A PHP-based domain management tool.
-Fetches and saves domain information, DNS records, and custom properties to local JSON files.
+Fetch and saves domain information, DNS records, and with custom properties to local json file.
 
 ## Features
 
@@ -178,7 +178,8 @@ See `todo-list.md` for planned features:
 
 ## License
 
-This project is open source. Please check the LICENSE file for details.
+This project is licensed under the GNU General Public License v3.0 (GPL-3.0).
+See the LICENSE file for details.
 
 ## Support
 

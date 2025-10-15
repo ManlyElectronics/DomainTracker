@@ -1,6 +1,7 @@
 # Domain Tracker
 
-A PHP-based domain monitoring and management tool for tracking domain information, DNS records, and organizing domains with custom properties.
+A PHP-based domain management tool.
+Fetches and saves domain information, DNS records, and custom properties to local JSON files.
 
 ## Features
 

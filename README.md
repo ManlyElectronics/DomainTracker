@@ -1,9 +1,11 @@
 # Domain Tracker
 
-A PHP-based domain management tool.
-Fetch and saves domain information, DNS records, and with custom properties to local json file.
+A PHP-based domain management tool for tracking and organizing domains with custom properties.
+
+Fetches and stores WHOIS data, DNS records (A, AAAA, MX, CNAME, TXT), and allows grouping domains using customizable property tags - all stored locally in JSON files.
 
 ![Domain Tracker Screenshot](Screenshot%202025-10-15%20181055.png)
+*Screenshot showing domain tracking with property management, sortable columns, and field visibility controls*
 
 ## Features
 

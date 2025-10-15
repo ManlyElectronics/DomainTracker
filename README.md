@@ -4,7 +4,7 @@ A PHP-based domain management tool for tracking and organizing domains with cust
 
 Fetches and stores WHOIS data, DNS records (A, AAAA, MX, CNAME, TXT), and allows grouping domains using customizable property tags - all stored locally in JSON files.
 
-![Domain Tracker Screenshot](Screenshot%202025-10-15%20181055.png)
+![Domain Tracker Screenshot](Screenshot%202025-10-15%20181427.png)
 *Screenshot showing domain tracking with property management, sortable columns, and field visibility controls*
 
 ## Features

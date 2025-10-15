@@ -68,6 +68,15 @@ Fetches and stores WHOIS data, DNS records (A, AAAA, MX, CNAME, TXT), and allows
 
 **Note:** The `domains.json` and `properties.json` files are created automatically when you add your first domain. No manual setup required!
 
+### Quick Deployment
+
+You can deploy Domain Tracker on any PHP-capable server:
+1. Copy `index.php` and `styles.css` (and optionally `config.xml`) to a folder on your server.
+2. Open the application in your browser.
+3. Add at least one domain using the form—`domains.json` and `properties.json` will be created automatically (no need to create them manually).
+
+No database or manual file setup is required.
+
 ### File Structure
 ```
 domain-tracker/

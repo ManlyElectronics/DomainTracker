@@ -3,6 +3,8 @@
 A PHP-based domain management tool.
 Fetch and saves domain information, DNS records, and with custom properties to local json file.
 
+![Domain Tracker Screenshot](Screenshot%202025-10-15%20181055.png)
+
 ## Features
 
 ### **Domain Monitoring**

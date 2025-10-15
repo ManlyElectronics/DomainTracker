@@ -2,7 +2,8 @@
 
 A PHP-based domain management tool for tracking and organizing domains with custom properties.
 
-Script is for the LOCAL use only. Do not publish it on public domains.
+> [!IMPORTANT]
+> **Security Notice:** This script is for LOCAL use only. Do not publish it on public domains or publicly accessible servers.
 
 Fetches and stores WHOIS data, DNS records (A, AAAA, MX, CNAME, TXT), and allows grouping domains using customizable property tags - all stored locally in JSON files.
 
